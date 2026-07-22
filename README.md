@@ -43,6 +43,22 @@ a backgrounded tab freezes its token rendering, so the DOM can't be trusted, but
 still ends exactly when the response does. ✅/⚠️ are "needs attention" markers: they only
 appear for tabs that finished unattended and clear the moment you focus the tab.
 
+### ⏸️ Draft mode
+Modeled on Claude Code's Shift+Tab mode switch. Press **Shift+Tab** in the message box
+to arm **Draft mode**, where you can compose freely — type, paste, attach files, dictate,
+switch models — with no way to submit by accident. Press **Shift+Tab** again (or click the
+button) to return to normal.
+
+- The composer's action button becomes a blue **Pause** — the **Send** button when the box
+  has text, the **Use voice mode** button when it's empty — and a **DRAFT** pill sits on the
+  composer as an always-on indicator. The pause uses claude's own Anthropicons glyph (U+E0BB).
+- Every submit path is blocked in a capture-phase listener: **Enter** does nothing
+  (**Shift+Enter** still inserts a newline), and a click on the Send/voice button returns you
+  to normal mode instead of sending. Voice mode — a text-less submit with no button to pause —
+  is neutralized the same way, since draft mode is a text-only feature.
+- The hover tooltip on those buttons is retitled while draft mode is on, and the state
+  resets to normal when you switch chats.
+
 More features can be toggled on/off from the popup.
 
 ## Install (unpacked)

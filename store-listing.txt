@@ -1,0 +1,69 @@
+========================================
+CHROME WEB STORE LISTING — Claude++
+========================================
+
+CATEGORY
+--------
+Workflow & Planning
+(Alternative: Tools)
+
+
+SHORT DESCRIPTION (summary — 132 char limit)
+--------------------------------------------
+Quality-of-life upgrades for claude.ai: color-code chats by project, safer deletes, tab status, inline asides, and draft mode.
+
+
+DETAILED DESCRIPTION
+--------------------
+Claude++ adds quality-of-life improvements to the claude.ai interface. It runs entirely in your browser — no account, no backend, and nothing ever leaves your device. All settings are stored locally, and every feature can be toggled on or off from the toolbar popup.
+
+🎨 Project colors
+Assign a color to a project and its chats get their sidebar icons tinted to match, so you can tell at a glance which chat belongs to which project.
+
+📁 Create project from a chat
+Adds a "+ Create new project" option to the Add to project menu, so a loose chat can go straight into a brand-new project in one step.
+
+🛡️ Delete guard
+Deleting a project on claude.ai silently deletes every chat, file, and artifact inside it. Claude++ hardens that dialog: it names what's being deleted, warns you what's included, and makes you type the project name to confirm — so nothing is lost to a stray click.
+
+⏳ Thinking status in the tab title
+Every claude.ai tab looks the same in the tab strip. Claude++ prefixes the title with a status glyph: ⏳ while a response is streaming, ✅ when one finished in a background tab, and ⚠️ if it ended with an error — so you know which tab needs you.
+
+💬 Inline asides
+Select any passage in a chat and ask a question about it. The answer streams into a card in the right margin, anchored to the text — like a comment beside a paragraph. Each ask runs in its own temporary conversation, so it stays out of your chat history.
+
+⏸️ Draft mode
+Inspired by Claude Code's Shift+Tab. Press Shift+Tab in the message box to arm Draft mode, where you can type, paste, attach, and dictate freely with no way to send by accident. Press Shift+Tab again to return to normal.
+
+↕️ Scroll navigation buttons
+A small toolbar beside the scrollbar for getting around a long chat: jump to the start, to the previous message you wrote, to the next message you wrote, or to the most recent — no dragging required.
+
+Privacy
+Claude++ stores everything locally with chrome.storage.local. It requires access to claude.ai only, collects no data, and sends nothing to any server. When you delete a chat or project, anything Claude++ saved for it is deleted too.
+
+Not affiliated with Anthropic. "Claude" is a trademark of Anthropic; this is an independent, unofficial extension.
+
+
+========================================
+PRIVACY TAB FIELDS (dashboard requires these)
+========================================
+
+SINGLE PURPOSE DESCRIPTION
+--------------------------
+Claude++ enhances the claude.ai web interface with quality-of-life features such as color-coding chats by project, guarding against accidental deletes, showing response status in the tab title, inline asides, a draft-composing mode, and scroll navigation buttons.
+
+PERMISSION JUSTIFICATION — "storage"
+------------------------------------
+Used to save the user's per-project colors, feature on/off preferences, learned chat-to-project associations, and inline asides. All data is stored locally with chrome.storage.local and never transmitted anywhere.
+
+PERMISSION JUSTIFICATION — host permission "https://claude.ai/*"
+---------------------------------------------------------------
+All features operate on the claude.ai interface. The content scripts read and enhance the page's DOM and observe claude.ai's own API responses to map chats to projects. Access is limited to claude.ai and no other sites.
+
+DATA USAGE DISCLOSURES
+----------------------
+- Does the extension collect user data? No.
+- Is data sold to third parties? No.
+- Is data used for purposes unrelated to the item's core functionality? No.
+- Is data used to determine creditworthiness or for lending? No.
+All data stays on the user's device (chrome.storage.local).

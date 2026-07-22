@@ -1,0 +1,55 @@
+/* Claude++ — scroll navigation buttons
+ *
+ * A vertical toolbar pinned to the bottom-right of the transcript, beside the
+ * scrollbar. It lives on <body> (position:fixed), outside React's tree, so
+ * claude.ai re-renders can't wipe it. Colours read from claude.ai's own custom
+ * properties, so light/dark and any token retune follow automatically. */
+
+.cpp-scrollnav {
+  position: fixed;
+  right: 14px;
+  bottom: 116px; /* clear of the composer, which sits at the bottom centre */
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--font-ui, system-ui, sans-serif);
+}
+
+.cpp-scrollnav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  margin: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  color: hsl(var(--text-300, 0 0% 40%));
+  background: hsl(var(--bg-000, 0 0% 100%));
+  border: 0.5px solid hsl(var(--border-300, 0 0% 85%));
+  box-shadow:
+    0 0.15rem 0.6rem hsl(var(--always-black, 0 0% 0%) / 8%),
+    0 0 0 0.5px hsl(var(--border-200, 0 0% 75%) / 0.25);
+  transition: color 0.12s ease, background 0.12s ease, opacity 0.12s ease;
+}
+
+.cpp-scrollnav-btn:hover:not(:disabled) {
+  color: hsl(var(--text-000, 0 0% 0%));
+  background: hsl(var(--bg-200, 0 0% 96%));
+}
+
+.cpp-scrollnav-btn:active:not(:disabled) {
+  background: hsl(var(--bg-300, 0 0% 92%));
+}
+
+.cpp-scrollnav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Nudge the paired-bar icons (start / most-recent) so their bar and chevron
+   read as one glyph rather than two stacked marks. */
+.cpp-scrollnav-btn svg {
+  display: block;
+}

@@ -47,6 +47,13 @@
       description:
         "Select any passage in a chat, ask a question about it, and the answer streams into a card in the right margin — anchored to the text, like a comment in a doc. Each ask runs in its own temporary (incognito) conversation, so it stays out of your history. Uses claude.ai's internal API, which may change without notice.",
       defaultEnabled: true
+    },
+    {
+      id: "draft-mode",
+      name: "Draft mode (Shift+Tab)",
+      description:
+        "Press Shift+Tab in the message box to arm Draft mode: keep typing, attaching files, dictating, and switching models freely, with no way to submit by accident. The Send button turns into a blue Pause; press Shift+Tab again (or click it) to return to normal. Shift+Enter still inserts a newline.",
+      defaultEnabled: true
     }
   ];
 })(typeof window !== "undefined" ? window : this);

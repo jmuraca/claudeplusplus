@@ -1,0 +1,106 @@
+/* Draft mode — the whole look is driven by one class, `cpp-draft`, that the
+   content script toggles on <html>. Keeping it CSS-only (no injected nodes)
+   means it rides through claude.ai re-mounting the composer on every keystroke
+   without us having to re-inject anything. */
+
+.cpp-draft {
+  --cpp-draft-blue: #2f7ff0;
+  --cpp-draft-blue-hover: #1f6fe0;
+}
+
+/* Draft mode takes over whichever action button is showing — Send when the box
+   has text, "Use voice mode" when it's empty. Neither submits now, so drop the
+   interactive send cursor on both. */
+.cpp-draft button[aria-label="Send message"],
+.cpp-draft button[aria-label="Use voice mode"] {
+  cursor: default;
+}
+
+/* Paint the button blue. Send draws its fill with an inner absolutely-positioned
+   span (bg-fill-brand), so we recolor that; the voice button is a ghost, so we
+   paint the button itself and hide its waveform SVG. Hold the color through hover
+   so the mode reads unambiguously either way. */
+.cpp-draft button[aria-label="Send message"] > span[aria-hidden="true"] {
+  background: var(--cpp-draft-blue) !important;
+}
+.cpp-draft button[aria-label="Send message"]:hover > span[aria-hidden="true"] {
+  background: var(--cpp-draft-blue-hover) !important;
+}
+.cpp-draft button[aria-label="Use voice mode"] {
+  position: relative;
+  background: var(--cpp-draft-blue) !important;
+}
+.cpp-draft button[aria-label="Use voice mode"]:hover {
+  background: var(--cpp-draft-blue-hover) !important;
+}
+.cpp-draft button[aria-label="Use voice mode"] svg {
+  visibility: hidden;
+}
+
+/* Overlay claude's own Pause glyph in white. Anthropicons carries a pause at
+   U+E0BB (the outline bars, matching the composer's other line icons), so we
+   render the real glyph the way the Send button renders its arrow — no SVG, no
+   mask. On Send we hide the arrow (a single PUA char that is the Icon span's
+   text, which CSS can't rewrite) and overlay the pause on that span, inheriting
+   its font size/weight/axes so E0BB matches the arrow exactly. On the ghostly
+   voice button there's no Icon span, so the overlay goes on the button and states
+   the icon size (20px, same as the composer's other icons). */
+.cpp-draft button[aria-label="Send message"] [data-cds="Icon"] {
+  position: relative;
+  color: transparent !important;
+}
+.cpp-draft button[aria-label="Send message"] [data-cds="Icon"]::after,
+.cpp-draft button[aria-label="Use voice mode"]::after {
+  content: "\E0BB";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: var(--font-anthropicons, "Anthropicons-Variable") !important;
+  line-height: 1;
+  pointer-events: none;
+}
+.cpp-draft button[aria-label="Use voice mode"]::after {
+  font-size: 20px;
+}
+
+/* Kill the crossfade claude runs when the composer swaps Send <-> voice button
+   (empty <-> has-text). It animates the opacity of the wrapper that holds these
+   buttons; with both overridden to the same blue Pause, that fade reads as a
+   pause -> blank -> pause flicker. The wrapper carries the arbitrary Tailwind
+   class `transition-[opacity,width,margin-left]`, and its inner layer drives the
+   fade via an inline `opacity`. Freeze both fully opaque with no transition so
+   the swap is instant and the Pause stays static. Scoped to that exact class, so
+   only this control slot is affected. */
+.cpp-draft [class*="transition-[opacity,width,margin-left]"],
+.cpp-draft [class*="transition-[opacity,width,margin-left]"] > div[style] {
+  opacity: 1 !important;
+  transition: none !important;
+}
+
+/* A "DRAFT" pill on the composer. This is a second, always-on indicator (the
+   button-based one only shows while a button is on screen), and the composer
+   wrapper is `position: sticky` (a positioned ancestor), so this absolute
+   pseudo-element anchors to it without us changing its layout. */
+.cpp-draft [data-chat-input-container]::before {
+  content: "Draft mode on (shift+tab to cycle)";
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-family: var(--font-ui, system-ui, -apple-system, sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: var(--cpp-draft-blue);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  white-space: nowrap;
+}

@@ -25,9 +25,10 @@
         "src/features/create-project.js",
         "src/features/delete-guard.js",
         "src/features/tab-status.js",
-        "src/features/asides.js"
+        "src/features/asides.js",
+        "src/features/draft-mode.js"
       ],
-      "css": ["styles/content.css", "styles/asides.css"],
+      "css": ["styles/content.css", "styles/asides.css", "styles/draft-mode.css"],
       "run_at": "document_start",
       "world": "ISOLATED"
     }

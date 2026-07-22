@@ -161,6 +161,10 @@
       eachEnabled(function (f) {
         if (f.onNetworkMap) f.onNetworkMap(d.pairs, ctx);
       });
+    } else if (d.type === "stream") {
+      eachEnabled(function (f) {
+        if (f.onStream) f.onStream(d, ctx);
+      });
     } else if (d.type === "location") {
       scheduleApply();
     }

@@ -85,13 +85,21 @@
       return origFetch.apply(this, args).then(function (res) {
         try {
           if (res && typeof res.clone === "function") {
-            res
-              .clone()
-              .text()
-              .then(function (t) {
-                scanText(reqUrl || (res && res.url) || "", t);
-              })
-              .catch(function () {});
+            var ctype = (res.headers && res.headers.get("content-type")) || "";
+            if (/text\/event-stream/i.test(ctype)) {
+              // A completion stream: watch it for the tab-status glyph. Don't
+              // hand it to scanText — it's SSE, not the conversation JSON that
+              // tap wants, and .text()'ing it would buffer the whole response.
+              maybeWatchStream(res);
+            } else {
+              res
+                .clone()
+                .text()
+                .then(function (t) {
+                  scanText(reqUrl || (res && res.url) || "", t);
+                })
+                .catch(function () {});
+            }
           }
         } catch (e) {}
         return res;
@@ -124,6 +132,61 @@
       });
       return origSend.apply(this, arguments);
     };
+  }
+
+  // --- completion-stream watch ---------------------------------------------
+  // The tab-status feature can't read generation state from the DOM: claude.ai
+  // renders streamed tokens on a rAF, which browsers freeze in a backgrounded
+  // tab, so a response that finishes while you're elsewhere leaves the DOM
+  // stuck mid-stream until you look at it. The network stream doesn't lie — it
+  // ends when the response ends, hidden tab or not. Detection is by response
+  // content-type (text/event-stream) rather than URL, so it survives claude.ai
+  // renaming the completion endpoint.
+  function reportStream(state, errored) {
+    window.postMessage(
+      { __cpp: true, type: "stream", state: state, errored: !!errored },
+      ORIGIN
+    );
+  }
+
+  // Read a clone of the stream to its end. We consume the clone fully, so this
+  // doesn't back up the branch the app itself is reading.
+  function watchStream(res) {
+    reportStream("start");
+    var errored = !res.ok;
+    if (!res.body) {
+      reportStream("end", errored);
+      return;
+    }
+    var reader = res.clone().body.getReader();
+    var decoder = new TextDecoder();
+    function pump() {
+      return reader.read().then(function (r) {
+        if (r.done) {
+          reportStream("end", errored);
+          return;
+        }
+        var chunk = decoder.decode(r.value, { stream: true });
+        // SSE error frames, however they're spelled.
+        if (/event:\s*error|"type"\s*:\s*"error"|"error"\s*:\s*\{/i.test(chunk)) {
+          errored = true;
+        }
+        return pump();
+      });
+    }
+    // A dropped connection is still a finished generation — and one worth
+    // flagging, since the answer is incomplete.
+    pump().catch(function () {
+      reportStream("end", true);
+    });
+  }
+
+  function maybeWatchStream(res) {
+    if (!res) return;
+    var type = (res.headers && res.headers.get("content-type")) || "";
+    if (!/text\/event-stream/i.test(type)) return;
+    if (!/\/api\//.test(res.url || "")) return;
+    watchStream(res);
   }
 
   // --- notify content.js about SPA navigation ------------------------------

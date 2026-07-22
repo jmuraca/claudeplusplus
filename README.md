@@ -89,6 +89,23 @@ button) to return to normal.
 - The hover tooltip on those buttons is retitled while draft mode is on, and the state
   resets to normal when you switch chats.
 
+### ↕️ Scroll navigation buttons
+A small toolbar pinned beside the scrollbar for getting around a long chat without dragging.
+Top to bottom: **jump to start**, **previous message you wrote**, **next message you wrote**,
+**jump to most recent**.
+
+- Prev/next also have keyboard shortcuts: **Alt+↑** (previous) and **Alt+↓** (next), mirroring
+  the up/down chevrons. They fire only while a conversation is open.
+- Prev/next step between your own turns (the user messages). claude.ai's transcript is
+  virtualized, so instead of enumerating every turn we lean on two facts: turns strictly
+  alternate (your turns sit two indices apart, and turn 0 is always yours), and any turn can
+  be reached by index — jump to an estimate, let the virtualizer mount what lands there, and
+  converge. When the neighbouring turn is already mounted its exact index is used.
+- The toolbar only appears while a scrollable conversation is open; **start/prev** grey out at
+  the top and **most-recent/next** grey out at the bottom.
+- Prev/next find your turns via claude.ai's `data-testid`, so if that ever changes those two
+  simply no-op while start/most-recent keep working.
+
 More features can be toggled on/off from the popup.
 
 ## Install (unpacked)

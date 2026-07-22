@@ -49,6 +49,13 @@
       defaultEnabled: true
     },
     {
+      id: "scroll-nav",
+      name: "Scroll navigation buttons",
+      description:
+        "Adds a small toolbar beside the scrollbar to jump around a long chat: to the start, to the previous message you wrote (Alt+↑), to the next message you wrote (Alt+↓), and to the most recent message.",
+      defaultEnabled: true
+    },
+    {
       id: "draft-mode",
       name: "Draft mode (Shift+Tab)",
       description:

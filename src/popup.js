@@ -1,14 +1,9 @@
 // Popup settings panel: toggle features and manage saved project colors.
 
-// Keep this list in sync with the feature modules under src/features/.
-var FEATURES = [
-  {
-    id: "project-colors",
-    name: "Project colors",
-    description: "Color-code sidebar chats by project, with a picker in the project header.",
-    defaultEnabled: true
-  }
-];
+// Feature metadata comes from the shared registry (features/registry.js),
+// loaded before this script — the same list core.js uses, so there's nothing
+// to keep in sync here.
+var FEATURES = window.CPP_FEATURES || [];
 
 function get(keys) {
   return new Promise(function (r) { chrome.storage.local.get(keys, r); });

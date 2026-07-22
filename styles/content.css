@@ -142,3 +142,218 @@
 #cpp-popover .cpp-clear:not(:disabled):hover {
   background: rgba(128, 128, 128, 0.18);
 }
+
+/* "+ Create new project" item injected into the Add-to-project submenu.
+   Sized/spaced to sit naturally among claude.ai's own menu items. */
+.cpp-create-project {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cpp-create-project:hover {
+  background: rgba(128, 128, 128, 0.15);
+}
+
+.cpp-create-plus {
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+/* Create-project modal (own overlay, centered) */
+.cpp-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.cpp-modal {
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: 18px;
+  border-radius: 12px;
+  background: #1f1f1f;
+  color: #f5f5f5;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.cpp-modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.cpp-modal-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.45);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.cpp-modal-input:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: -1px;
+}
+
+.cpp-modal-error {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #f87171;
+}
+
+.cpp-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.cpp-modal-cancel,
+.cpp-modal-save {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+}
+
+.cpp-modal-cancel:hover {
+  background: rgba(128, 128, 128, 0.15);
+}
+
+.cpp-modal-save {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #fff;
+}
+
+.cpp-modal-save:hover {
+  filter: brightness(1.08);
+}
+
+.cpp-modal-save:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (prefers-color-scheme: light) {
+  .cpp-modal {
+    background: #ffffff;
+    color: #1a1a1a;
+    border-color: rgba(0, 0, 0, 0.12);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  }
+  .cpp-modal-error {
+    color: #dc2626;
+  }
+}
+
+/* Delete-project confirmation guard (injected into claude.ai's delete dialog) */
+.cpp-del-guard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.cpp-del-warning {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #b54708;
+}
+
+.cpp-del-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.45);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.cpp-del-input:focus {
+  outline: 2px solid #e5484d;
+  outline-offset: -1px;
+}
+
+/* Held-closed Delete button — claude.ai styles its own :disabled, this just
+   makes the blocked state unmistakable. */
+.cpp-del-blocked {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cpp-del-warning {
+    color: #f5a524;
+  }
+}
+
+/* Confirmation toast — top-right, styled to match claude.ai's own surfaces.
+   Colors come from claude's theme tokens (hsl(var(--bg-000)) etc.), which are
+   theme-aware, so it tracks light/dark automatically. Each token line is paired
+   with a plain fallback on the line above: if the token isn't defined the
+   invalid token declaration is dropped and the fallback stands. */
+.cpp-toast {
+  position: fixed;
+  top: 64px;
+  right: 16px;
+  z-index: 2147483001;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: #ffffff;
+  background: hsl(var(--bg-000));
+  color: #1a1a1a;
+  color: hsl(var(--text-100));
+  border: 0.5px solid rgba(0, 0, 0, 0.12);
+  border: 0.5px solid hsl(var(--border-300));
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+  animation: cpp-toast-in 0.18s ease-out;
+}
+
+/* Fallback tint if claude's tokens aren't present and the OS is in dark mode.
+   When the tokens ARE present they win here too, so this only affects fallback. */
+@media (prefers-color-scheme: dark) {
+  .cpp-toast {
+    background: #2b2a27;
+    background: hsl(var(--bg-000));
+    color: #f5f5f5;
+    color: hsl(var(--text-100));
+    border-color: rgba(255, 255, 255, 0.12);
+    border-color: hsl(var(--border-300));
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(255, 255, 255, 0.04);
+  }
+}
+
+@keyframes cpp-toast-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}

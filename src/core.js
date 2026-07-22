@@ -81,17 +81,6 @@
     util: util,
     registerFeature: function (feature) {
       features.push(feature);
-    },
-    // Used by the popup via chrome.storage; exposed here for completeness.
-    listFeatures: function () {
-      return features.map(function (f) {
-        return {
-          id: f.id,
-          name: f.name || f.id,
-          description: f.description || "",
-          enabled: isEnabled(f)
-        };
-      });
     }
   };
   window.CPP = CPP;

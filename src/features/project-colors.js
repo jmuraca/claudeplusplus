@@ -104,9 +104,6 @@
       else untintIcon(icon);
     }
     decorateProjectCards(ctx);
-    // Drop any floating dots left by earlier versions of this feature.
-    var dots = document.querySelectorAll(".cpp-dot");
-    for (var k = 0; k < dots.length; k++) dots[k].remove();
   }
 
   // ---- project-list cards -------------------------------------------------
@@ -384,7 +381,7 @@
       if (pop) pop.remove();
       var tinted = document.querySelectorAll(".cpp-tinted");
       for (var i = 0; i < tinted.length; i++) untintIcon(tinted[i]);
-      var dots = document.querySelectorAll(".cpp-dot, .cpp-proj-dot");
+      var dots = document.querySelectorAll(".cpp-proj-dot");
       for (var j = 0; j < dots.length; j++) dots[j].remove();
     }
   });

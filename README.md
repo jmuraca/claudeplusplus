@@ -80,11 +80,55 @@ observes them:
 
 ### Storage keys
 
-| Key             | Shape                              | Purpose                          |
-| --------------- | ---------------------------------- | -------------------------------- |
-| `projectColors` | `{ [projectUuid]: "#rrggbb" }`     | user-chosen color per project    |
-| `convProject`   | `{ [conversationUuid]: projectUuid }` | learned chat→project mapping  |
-| `cppFeatures`   | `{ [featureId]: boolean }`         | per-feature enable/disable       |
+| Key                        | Shape                                 | Purpose                          |
+| -------------------------- | ------------------------------------- | -------------------------------- |
+| `projectColors`            | `{ [projectUuid]: "#rrggbb" }`        | user-chosen color per project    |
+| `convProject`              | `{ [conversationUuid]: projectUuid }` | learned chat→project mapping     |
+| `cppAsides:<conversationUuid>` | `[{ id, anchor, question, answer }]` | inline asides for one chat (one key per chat) |
+| `cppFeatures`              | `{ [featureId]: boolean }`            | per-feature enable/disable       |
+
+Everything keyed by a chat or project uuid is reaped when that chat/project is
+deleted — see [Deletion cleanup](#deletion-cleanup) below.
+
+### Deletion cleanup
+
+Because storage is keyed by chat and project uuids, deleting a chat or project on
+claude.ai would otherwise orphan whatever we saved under it — the chat's asides and
+its `convProject` mapping, or a project's color. Those uuids are never reused, so
+orphans are inert rather than wrong, but the asides case is a real privacy concern:
+the question/answer text would outlive the chat it was about. So we reap on delete.
+
+The authoritative "it's really gone" signal is the successful `DELETE` claude.ai
+sends to the resource's own endpoint — it fires only on success, from whichever UI
+path the user took (chat **⋯** menu, project menu, or the projects list):
+
+```
+DELETE /api/organizations/<org>/chat_conversations/<uuid>   → 204
+DELETE /api/organizations/<org>/projects/<uuid>             → 204
+```
+
+`inject-main.js` detects those (the uuid must be the final path segment, so the
+app's own follow-up `GET …/projects/<uuid>/accounts` refetches are ignored) and
+posts `{ type: "delete", kind: "chat" | "project", id }`. `core.js` turns that into
+an `onDelete(info, ctx)` call on each enabled feature, and **cascades**:
+
+- **Chat deleted** → each feature drops what it keyed under that chat: `asides`
+  removes `cppAsides:<id>`; `project-colors` removes the `convProject[id]` mapping.
+- **Project deleted** → `project-colors` removes `projectColors[id]`, drops every
+  `convProject` row pointing at it, and **returns those chat ids**. core then fans
+  each out as its own chat delete, so a feature that doesn't know project membership
+  (like `asides`) still learns which chats to reap.
+
+A project delete therefore flows **project → its chats → each chat's asides** without
+any feature needing to know more than its own storage. Deleting a single aside is
+separate: the card's **×** button already removes just that entry from its chat's key.
+
+Two limits worth knowing:
+
+- **Bulk multi-select delete** likely uses a different endpoint/body and is not yet
+  handled (see the note in `inject-main.js`).
+- Cleanup only runs for **enabled** features (an `onDelete` on a disabled feature
+  isn't called), so disabling `project-colors` also stops the project→chats cascade.
 
 ## Adding a feature
 
@@ -100,12 +144,14 @@ observes them:
      onApply(ctx) {},      // debounced, on DOM mutation / navigation
      onNetworkMap(pairs, ctx) {}, // optional: [{ conv, project }] from the API tap
      onStream(evt, ctx) {}, // optional: { state: "start"|"end", errored } completion-stream events
+     onDelete(info, ctx) {}, // optional: { kind: "chat"|"project", id } — reap storage keyed by that id.
+                             // Returning chat ids from a "project" delete cascades them as chat deletes.
      onTeardown(ctx) {}    // when the feature is disabled; undo DOM changes
    });
    ```
 
    `ctx.util` provides `currentProjectId()`, `convFromHref(href)`, the UUID regexes,
-   and promise-based `get(keys)` / `set(obj)` storage helpers.
+   and promise-based `get(keys)` / `set(obj)` / `remove(keys)` storage helpers.
 
 2. Add its file to `content_scripts[].js` in `manifest.json` (after `core.js`).
 3. Add its `{ id, name, description, defaultEnabled }` to the list in

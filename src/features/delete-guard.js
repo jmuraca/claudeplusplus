@@ -152,12 +152,9 @@
     syncDeleteButton(dialog);
   }
 
+  // Metadata (name/description/defaultEnabled) lives in features/registry.js.
   CPP.registerFeature({
     id: "delete-guard",
-    name: "Delete project confirmation",
-    description:
-      "Warns that deleting a project also deletes its chats, files, and artifacts, and requires typing the project name before the Delete button unlocks.",
-    defaultEnabled: true,
 
     onApply: function () {
       enhanceDeleteDialogs();

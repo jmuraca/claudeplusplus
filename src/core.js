@@ -77,9 +77,22 @@
   var started = false;
   var ctx = { util: util };
 
+  // Feature metadata (name/description/defaultEnabled) lives in the shared
+  // registry (features/registry.js), loaded before this script. Index it by id
+  // so a registering module only has to supply { id, ...hooks }.
+  var META = {};
+  (window.CPP_FEATURES || []).forEach(function (m) {
+    if (m && m.id) META[m.id] = m;
+  });
+
   var CPP = {
     util: util,
     registerFeature: function (feature) {
+      var meta = META[feature.id];
+      // Pull defaultEnabled from the registry unless the module overrode it.
+      if (meta && feature.defaultEnabled === undefined) {
+        feature.defaultEnabled = meta.defaultEnabled;
+      }
       features.push(feature);
     }
   };

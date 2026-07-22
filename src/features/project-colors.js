@@ -332,11 +332,9 @@
     decorate(ctx);
   }
 
+  // Metadata (name/description/defaultEnabled) lives in features/registry.js.
   CPP.registerFeature({
     id: "project-colors",
-    name: "Project colors",
-    description: "Color-code sidebar chats by project, with a picker in the project header.",
-    defaultEnabled: true,
 
     onInit: function (ctx) {
       loadState(ctx).then(function () {

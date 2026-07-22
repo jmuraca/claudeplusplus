@@ -1,0 +1,38 @@
+// Feature registry — the single source of truth for feature metadata.
+//
+// Loaded in two contexts:
+//   • as the first isolated-world content script (before core.js), so core can
+//     look up a feature's defaultEnabled by id when the module registers, and
+//   • in popup.html (before popup.js), so the settings panel can render one
+//     toggle per feature.
+//
+// Feature modules under src/features/ pass only { id, ...hooks } to
+// CPP.registerFeature; their user-facing name/description/defaultEnabled live
+// here so there's exactly one place to edit when a feature is added or renamed.
+(function (root) {
+  "use strict";
+
+  root.CPP_FEATURES = [
+    {
+      id: "project-colors",
+      name: "Project colors",
+      description:
+        "Color-code sidebar chats by project, with a picker in the project header.",
+      defaultEnabled: true
+    },
+    {
+      id: "create-project",
+      name: "Create project from a chat",
+      description:
+        'Adds "+ Create new project" to the Add-to-project menu, so a loose chat can be filed into a new project in one step.',
+      defaultEnabled: true
+    },
+    {
+      id: "delete-guard",
+      name: "Delete project confirmation",
+      description:
+        "Warns that deleting a project also deletes its chats, files, and artifacts, and requires typing the project name before the Delete button unlocks.",
+      defaultEnabled: true
+    }
+  ];
+})(typeof window !== "undefined" ? window : this);

@@ -19,8 +19,10 @@
     {
       "matches": ["https://claude.ai/*"],
       "js": [
+        "src/features/registry.js",
         "src/core.js",
         "src/features/project-colors.js",
+        "src/features/create-project.js",
         "src/features/delete-guard.js"
       ],
       "css": ["styles/content.css"],

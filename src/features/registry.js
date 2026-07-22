@@ -40,6 +40,13 @@
       description:
         "Prefixes the browser tab title with a status glyph — ⏳ while a response is streaming, ✅ when one finishes while you're on another tab, ⚠️ if it ended with an error — so you can tell at a glance which tab is working or waiting on you.",
       defaultEnabled: true
+    },
+    {
+      id: "asides",
+      name: "Inline asides",
+      description:
+        "Select any passage in a chat, ask a question about it, and the answer streams into a card in the right margin — anchored to the text, like a comment in a doc. Each ask runs in its own temporary (incognito) conversation, so it stays out of your history. Uses claude.ai's internal API, which may change without notice.",
+      defaultEnabled: true
     }
   ];
 })(typeof window !== "undefined" ? window : this);

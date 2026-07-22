@@ -24,9 +24,10 @@
         "src/features/project-colors.js",
         "src/features/create-project.js",
         "src/features/delete-guard.js",
-        "src/features/tab-status.js"
+        "src/features/tab-status.js",
+        "src/features/asides.js"
       ],
-      "css": ["styles/content.css"],
+      "css": ["styles/content.css", "styles/asides.css"],
       "run_at": "document_start",
       "world": "ISOLATED"
     }

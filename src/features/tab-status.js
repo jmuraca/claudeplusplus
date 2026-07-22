@@ -29,6 +29,7 @@
 
   // Lifecycle handles kept so onTeardown can fully undo everything.
   var headObserver = null;
+  var bodyObserver = null;
   var pollTimer = null;
   var outcomeTimer = null;
   var focusHandler = null;
@@ -151,11 +152,26 @@
       window.addEventListener("focus", focusHandler);
       window.addEventListener("visibilitychange", focusHandler);
 
-      // The stream start/end (via onStream) drives the ⏳→✅ transition and
-      // keeps working in a backgrounded tab, where timers are throttled. This
-      // interval is only a foreground backstop: it picks up the pre-first-stream
-      // DOM fallback and lets an error notice (which renders a beat after the
-      // stream ends) upgrade a ✅ to ⚠️.
+      // Load-bearing for the navigate-away case, and the reason it can't be
+      // folded into core's debounced onApply. In a backgrounded tab claude.ai's
+      // token rendering (rAF) is frozen, but the data-is-streaming flip and the
+      // stop-button removal at stream *end* are plain DOM state changes that
+      // still fire — and a MutationObserver callback still runs — so this is
+      // what flips the title to ✅ while you're on another tab. onStream is a
+      // second signal, but the network stream isn't reliably delivered in the
+      // background, so we can't depend on it alone. Attributes are filtered to
+      // the streaming/stop-button signals so a live response doesn't wake this
+      // on every token.
+      bodyObserver = new MutationObserver(checkTabStatus);
+      bodyObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["data-is-streaming", "data-testid", "aria-label"]
+      });
+
+      // Foreground backstop only — throttled to ~1/min in a hidden tab, so the
+      // observer above is what actually makes the transition prompt there.
       pollTimer = setInterval(checkTabStatus, 1000);
       checkTabStatus();
     },
@@ -176,6 +192,7 @@
     onTeardown: function () {
       started = false;
       if (headObserver) { headObserver.disconnect(); headObserver = null; }
+      if (bodyObserver) { bodyObserver.disconnect(); bodyObserver = null; }
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       if (outcomeTimer) { clearInterval(outcomeTimer); outcomeTimer = null; }
       if (focusHandler) {

@@ -1315,6 +1315,24 @@
       if (asides.size) repaint();
     },
 
+    // Core calls this when claude.ai deletes a chat (directly, or as one of a
+    // deleted project's chats — core fans those out as chat deletes). Drop the
+    // per-chat storage key. Project-kind deletes are ignored: asides has no
+    // project concept, and the member chats arrive as their own chat deletes.
+    onDelete: function (info) {
+      if (!info || info.kind !== "chat" || !ctx) return;
+      ctx.util.remove(storeKey(info.id));
+      // If the deleted chat is somehow the one on screen, drop the live state
+      // too so its cards/highlights don't linger until the next reload.
+      if (info.id === convoId()) {
+        inflight.forEach(function (c) { c.abort(); });
+        inflight.clear();
+        asides.clear();
+        activeId = null;
+        repaint();
+      }
+    },
+
     onTeardown: function () {
       inflight.forEach(function (c) { c.abort(); });
       inflight.clear();

@@ -357,6 +357,51 @@
       apply(ctx);
     },
 
+    // Reap storage when claude.ai deletes a chat or project (core drives this).
+    // Bail if state hasn't loaded yet: colors/chatMap are still {} then, and
+    // saving those would clobber the stored maps. Deletes are user actions well
+    // after init, so in practice this only skips a delete in the first tick.
+    onDelete: function (info, ctx) {
+      if (!info || !loaded) return;
+
+      if (info.kind === "chat") {
+        if (Object.prototype.hasOwnProperty.call(chatMap, info.id)) {
+          delete chatMap[info.id];
+          ctx.util.set({ convProject: chatMap });
+          apply(ctx);
+        }
+        return;
+      }
+
+      if (info.kind === "project") {
+        var changed = false;
+        if (Object.prototype.hasOwnProperty.call(colors, info.id)) {
+          delete colors[info.id];
+          saveColors(ctx);
+          changed = true;
+        }
+        // Deleting a project deletes its chats server-side too. Collect the
+        // ones we've mapped, drop their mappings in a single write, and hand
+        // the ids back so core can fan out chat deletes to the other features.
+        var members = [];
+        for (var conv in chatMap) {
+          if (
+            Object.prototype.hasOwnProperty.call(chatMap, conv) &&
+            chatMap[conv] === info.id
+          ) {
+            members.push(conv);
+          }
+        }
+        if (members.length) {
+          for (var i = 0; i < members.length; i++) delete chatMap[members[i]];
+          ctx.util.set({ convProject: chatMap });
+          changed = true;
+        }
+        if (changed) apply(ctx);
+        return members;
+      }
+    },
+
     onNetworkMap: function (pairs, ctx) {
       var changed = false;
       for (var i = 0; i < pairs.length; i++) {

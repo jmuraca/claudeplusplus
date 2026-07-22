@@ -9,8 +9,16 @@
 (function () {
   "use strict";
 
-  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  var UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+  var UUID_RE = new RegExp("^" + UUID + "$", "i");
   var ORIGIN = location.origin;
+
+  // A chat or project deletion is a DELETE to its own REST resource, with the
+  // uuid as the final path segment. Anchored to end-of-path (allowing a query or
+  // hash) so a DELETE against a *sub*-resource (…/chat_conversations/<id>/foo)
+  // doesn't read as deleting the chat itself.
+  var DEL_PROJECT_RE = new RegExp("/projects/(" + UUID + ")/?(?:[?#].*)?$", "i");
+  var DEL_CHAT_RE = new RegExp("/chat_conversations/(" + UUID + ")/?(?:[?#].*)?$", "i");
 
   function isUuid(v) {
     return typeof v === "string" && UUID_RE.test(v);
@@ -58,6 +66,35 @@
     window.postMessage({ __cpp: true, type: "map", pairs: list }, ORIGIN);
   }
 
+  // A successful DELETE against a chat's or project's own resource is the
+  // authoritative "it's really gone" signal — it fires only on success, from
+  // whichever UI path the user took. We hand the id to content.js so features
+  // can reap whatever they persisted under it (and, for a project, its chats).
+  //
+  // Confirmed shapes (single delete):
+  //   DELETE /api/organizations/<org>/chat_conversations/<uuid>  -> 204
+  //   DELETE /api/organizations/<org>/projects/<uuid>            -> 204
+  // The app's own follow-up GET .../projects/<uuid>/accounts 404s are ignored
+  // both by the method check and by anchoring the uuid to the end of the path.
+  //
+  // NOTE: bulk multi-select delete is unconfirmed and likely a different
+  // endpoint/body — not handled here.
+  function reportDelete(method, url, ok) {
+    if (!ok || String(method).toUpperCase() !== "DELETE") return;
+    if (!/\/api\//.test(url || "")) return;
+    var m = DEL_PROJECT_RE.exec(url);
+    if (m) return postDelete("project", m[1]);
+    m = DEL_CHAT_RE.exec(url);
+    if (m) return postDelete("chat", m[1]);
+  }
+
+  function postDelete(kind, id) {
+    window.postMessage(
+      { __cpp: true, type: "delete", kind: kind, id: id.toLowerCase() },
+      ORIGIN
+    );
+  }
+
   function scanText(url, text) {
     if (typeof text !== "string" || text.length === 0) return;
     // Only bother with endpoints likely to contain conversation/project data.
@@ -82,8 +119,13 @@
       var reqUrl =
         (args[0] && typeof args[0] === "object" && args[0].url) ||
         (typeof args[0] === "string" ? args[0] : "");
+      var reqMethod =
+        (args[0] && typeof args[0] === "object" && args[0].method) ||
+        (args[1] && args[1].method) ||
+        "GET";
       return origFetch.apply(this, args).then(function (res) {
         try {
+          reportDelete(reqMethod, reqUrl || (res && res.url) || "", res && res.ok);
           if (res && typeof res.clone === "function") {
             var ctype = (res.headers && res.headers.get("content-type")) || "";
             if (/text\/event-stream/i.test(ctype)) {
@@ -114,12 +156,15 @@
     var origSend = XHR.prototype.send;
     XHR.prototype.open = function (method, url) {
       this.__cppUrl = url;
+      this.__cppMethod = method;
       return origOpen.apply(this, arguments);
     };
     XHR.prototype.send = function () {
       var self = this;
       this.addEventListener("load", function () {
         try {
+          var okStatus = self.status >= 200 && self.status < 300;
+          reportDelete(self.__cppMethod, self.__cppUrl || self.responseURL || "", okStatus);
           var rt = self.responseType;
           if (rt === "" || rt === "text") {
             scanText(self.__cppUrl || self.responseURL || "", self.responseText);

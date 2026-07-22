@@ -69,6 +69,19 @@
           resolve();
         }
       });
+    },
+    remove: function (keys) {
+      return new Promise(function (resolve) {
+        if (!util.contextAlive()) return resolve();
+        try {
+          chrome.storage.local.remove(keys, function () {
+            void (chrome.runtime && chrome.runtime.lastError);
+            resolve();
+          });
+        } catch (e) {
+          resolve();
+        }
+      });
     }
   };
 
@@ -151,6 +164,36 @@
   }
   CPP.scheduleApply = scheduleApply;
 
+  // A deletion cascades. A chat delete is dispatched as-is; features reap
+  // whatever they keyed under that chat id. A project delete is dispatched
+  // first as a project — the feature that owns the conv->project mapping
+  // (project-colors) returns the affected chat ids — and each of those is then
+  // fanned out as its own chat delete, so features like asides that don't know
+  // project membership still get told which chats to reap. Chat deletes don't
+  // cascade further, so there's no recursion to bound.
+  function dispatchDelete(info) {
+    if (deadCtx) return;
+    var cascade = [];
+    eachEnabled(function (f) {
+      if (!f.onDelete) return;
+      var extra = f.onDelete(info, ctx);
+      if (info.kind === "project" && Array.isArray(extra)) {
+        for (var i = 0; i < extra.length; i++) cascade.push(extra[i]);
+      }
+    });
+    if (info.kind !== "project" || !cascade.length) return;
+    var seen = {};
+    cascade.forEach(function (chatId) {
+      var id = String(chatId).toLowerCase();
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      var child = { kind: "chat", id: id, viaProject: info.id };
+      eachEnabled(function (f) {
+        if (f.onDelete) f.onDelete(child, ctx);
+      });
+    });
+  }
+
   // Network data relayed from inject-main.js (MAIN world).
   window.addEventListener("message", function (ev) {
     if (deadCtx) return;
@@ -165,6 +208,8 @@
       eachEnabled(function (f) {
         if (f.onStream) f.onStream(d, ctx);
       });
+    } else if (d.type === "delete" && d.kind && d.id) {
+      dispatchDelete({ kind: d.kind, id: String(d.id).toLowerCase() });
     } else if (d.type === "location") {
       scheduleApply();
     }

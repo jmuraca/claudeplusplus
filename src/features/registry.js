@@ -33,6 +33,13 @@
       description:
         "Warns that deleting a project also deletes its chats, files, and artifacts, and requires typing the project name before the Delete button unlocks.",
       defaultEnabled: true
+    },
+    {
+      id: "tab-status",
+      name: "Thinking status in tab title",
+      description:
+        "Prefixes the browser tab title with a status glyph — ⏳ while a response is streaming, ✅ when one finishes while you're on another tab, ⚠️ if it ended with an error — so you can tell at a glance which tab is working or waiting on you.",
+      defaultEnabled: true
     }
   ];
 })(typeof window !== "undefined" ? window : this);

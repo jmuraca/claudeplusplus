@@ -29,6 +29,20 @@ live the moment the dialog opens. This feature hardens that dialog:
 
 Works from both the projects list (`/cowork/projects`) and a single project's **⋯** menu.
 
+### ⏳ Thinking status in tab title
+From the browser's tab strip every claude.ai tab looks identical, so you can't tell the
+one that's mid-response from the one that answered a while ago and is waiting on you.
+This prefixes the tab title with a status glyph:
+
+- **⏳** — a response is streaming in this tab.
+- **✅** — a response finished while you were looking at another tab (clears when you return).
+- **⚠️** — the response ended with an error (clears when you return).
+
+Generation state is read from claude.ai's own completion **network stream**, not the DOM —
+a backgrounded tab freezes its token rendering, so the DOM can't be trusted, but the stream
+still ends exactly when the response does. ✅/⚠️ are "needs attention" markers: they only
+appear for tabs that finished unattended and clear the moment you focus the tab.
+
 More features can be toggled on/off from the popup.
 
 ## Install (unpacked)
@@ -85,6 +99,7 @@ observes them:
      onInit(ctx) {},       // once, after settings load (and when re-enabled)
      onApply(ctx) {},      // debounced, on DOM mutation / navigation
      onNetworkMap(pairs, ctx) {}, // optional: [{ conv, project }] from the API tap
+     onStream(evt, ctx) {}, // optional: { state: "start"|"end", errored } completion-stream events
      onTeardown(ctx) {}    // when the feature is disabled; undo DOM changes
    });
    ```
@@ -93,7 +108,9 @@ observes them:
    and promise-based `get(keys)` / `set(obj)` storage helpers.
 
 2. Add its file to `content_scripts[].js` in `manifest.json` (after `core.js`).
-3. Add an entry to the `FEATURES` list in `src/popup.js` so it shows a toggle.
+3. Add its `{ id, name, description, defaultEnabled }` to the list in
+   `src/features/registry.js` — the single source of truth core.js and the popup
+   both read, so the toggle appears automatically.
 
 ## Notes / limitations
 

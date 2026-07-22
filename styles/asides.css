@@ -1,0 +1,279 @@
+/* Claude++ — margin asides
+ *
+ * The popover, card layer, and gutter live on <body>, outside React's tree, so
+ * claude.ai re-renders can't wipe them. That's why everything here is
+ * position:fixed rather than anchored into the transcript. */
+
+/* Mirrors the main composer: same surface token, 20px radius, the same two-part
+   shadow (soft drop + hairline ring). Values are read from claude.ai's own
+   custom properties rather than copied as literals, so light/dark and any token
+   retune follow automatically. */
+.cpa-popover {
+  position: fixed;
+  z-index: 2147483000;
+  width: 340px;
+  box-sizing: border-box;
+  border-radius: 20px;
+  background: hsl(var(--bg-000, 0 0% 100%));
+  border: 1px solid transparent;
+  box-shadow:
+    0 0.25rem 1.25rem hsl(var(--always-black, 0 0% 0%) / 7.5%),
+    0 0 0 0.5px hsl(var(--border-200, 0 0% 75%) / 0.3);
+  font-family: var(--font-ui, system-ui, sans-serif);
+}
+
+/* Single row: the question grows, the send button sits at the end of the same
+   line. Padding is asymmetric so the button's own inset reads as balanced. */
+.cpa-composer {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 8px 8px 14px;
+}
+
+/* The send button is styled entirely by claude.ai's own utility classes, so
+   there is deliberately nothing for it here. */
+
+/* Separator between our Ask and claude.ai's Reply. Tinted from currentColor so
+   it tracks their tooltip if it ever stops being dark-on-translucent. */
+.cpa-tip-rule {
+  width: 1px;
+  align-self: stretch;
+  margin: 6px 0;
+  background: currentColor;
+  opacity: 0.18;
+  flex: 0 0 auto;
+}
+
+/* Sizing comes from claude.ai's `font-large` utility on the element itself;
+   these are only the resets plus a fallback size if that utility is renamed. */
+.cpa-question {
+  flex: 1 1 auto;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: hsl(var(--text-100, 0 0% 12%));
+}
+
+.cpa-question::placeholder {
+  color: hsl(var(--text-500, 0 0% 55%));
+}
+
+/* Highlights are painted with the CSS Custom Highlight API, so these rules
+   decorate Ranges without any element existing to carry them. Only a small
+   property set is honoured here — colour, background, text-decoration and
+   text-shadow — which is exactly why nothing tries to draw a border. */
+::highlight(cpa-aside) {
+  background-color: hsl(45 100% 51% / 28%);
+}
+
+/* Stands in for the native selection while the question box has focus. Tinted
+   like a saved aside rather than like a text selection, so the highlight you
+   see while typing is the highlight you get when you submit. */
+::highlight(cpa-pending) {
+  background-color: hsl(45 100% 51% / 45%);
+}
+
+::highlight(cpa-aside-active) {
+  background-color: hsl(45 100% 51% / 55%);
+  text-decoration: underline;
+  text-decoration-color: hsl(36 100% 40%);
+  text-decoration-thickness: 2px;
+}
+
+/* Card layer. Fixed and pointer-transparent so it never intercepts clicks meant
+   for the transcript; only the cards themselves take pointer events. */
+.cpa-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482800;
+  pointer-events: none;
+}
+
+.cpa-layer[hidden] {
+  display: none;
+}
+
+.cpa-card {
+  position: fixed;
+  pointer-events: auto;
+  box-sizing: border-box;
+  padding: 10px 26px 10px 12px;
+  border-radius: 10px;
+  background: hsl(var(--bg-000, 0 0% 100%));
+  border: 1px solid hsl(var(--border-300, 0 0% 85%));
+  box-shadow: 0 2px 10px hsl(0 0% 0% / 7%);
+  font: 13px/1.5 var(--font-ui, system-ui, sans-serif);
+  color: hsl(var(--text-100, 0 0% 12%));
+  cursor: pointer;
+  transition: top 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+}
+
+.cpa-card.cpa-active {
+  border-color: hsl(36 100% 45%);
+  box-shadow: 0 4px 16px hsl(0 0% 0% / 12%);
+}
+
+/* The quoted span is the tie back to the text, so it reads as a citation. */
+.cpa-card-quote {
+  margin-bottom: 6px;
+  padding-left: 8px;
+  border-left: 2px solid hsl(45 100% 51% / 70%);
+  color: hsl(var(--text-300, 0 0% 40%));
+  font-size: 12px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.cpa-card-q {
+  font-weight: 500;
+}
+
+.cpa-card-a {
+  margin-top: 6px;
+  color: hsl(var(--text-300, 0 0% 40%));
+  white-space: pre-wrap;
+}
+
+.cpa-card-a:empty {
+  display: none;
+}
+
+/* Inline markdown rendered into the answer (bold/italic/code/links). */
+.cpa-card-a strong {
+  font-weight: 600;
+}
+
+.cpa-card-a em {
+  font-style: italic;
+}
+
+.cpa-card-a code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.92em;
+  background: hsl(var(--bg-300, 0 0% 94%));
+  padding: 0.05em 0.3em;
+  border-radius: 4px;
+}
+
+.cpa-card-a a {
+  color: hsl(36 100% 40%);
+  text-decoration: underline;
+}
+
+/* While tokens are arriving, with a caret so a slow first token doesn't read as
+   a hang. Answers are never clamped mid-stream — watching text appear and then
+   vanish under a line-clamp is worse than a briefly tall card. */
+.cpa-card[data-pending="1"] .cpa-card-a {
+  color: hsl(var(--text-300, 0 0% 40%));
+  -webkit-line-clamp: unset;
+}
+
+.cpa-card[data-pending="1"] .cpa-card-a::after {
+  content: "▍";
+  margin-left: 1px;
+  animation: cpa-blink 1s steps(2, start) infinite;
+}
+
+@keyframes cpa-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* Collapsed until focused, so a column of cards stays scannable. */
+.cpa-card:not(.cpa-active) .cpa-card-a {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+/* The quote no longer exists in the transcript — the message was edited. The
+   aside is kept and flagged rather than silently dropped. */
+.cpa-card.cpa-orphan {
+  border-style: dashed;
+  opacity: 0.75;
+}
+
+.cpa-card.cpa-orphan .cpa-card-quote {
+  border-left-color: hsl(var(--border-300, 0 0% 85%));
+  text-decoration: line-through;
+}
+
+.cpa-card-x {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: hsl(var(--text-500, 0 0% 55%));
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.cpa-card:hover .cpa-card-x,
+.cpa-card.cpa-active .cpa-card-x {
+  opacity: 1;
+}
+
+.cpa-card-x:hover {
+  background: hsl(var(--bg-300, 0 0% 94%));
+  color: hsl(var(--text-100, 0 0% 12%));
+}
+
+/* Too narrow for cards: collapse to markers in the margin. */
+.cpa-layer[data-mode="dots"] .cpa-card {
+  width: 10px !important;
+  height: 10px;
+  padding: 0;
+  border-radius: 50%;
+  background: hsl(45 100% 51%);
+  border-color: hsl(36 100% 40%);
+  overflow: hidden;
+}
+
+.cpa-layer[data-mode="dots"] .cpa-card > * {
+  display: none;
+}
+
+/* Counts of asides on messages the virtualizer has unmounted. These sit in the
+   margin the cards will later occupy, so they're positioned from the measured
+   feed edge rather than a fixed offset. */
+.cpa-gutter {
+  position: fixed;
+  z-index: 2147482900;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font: 500 12px/1.5 var(--font-ui, system-ui, sans-serif);
+  color: hsl(var(--text-300, 0 0% 40%));
+  background: hsl(var(--bg-000, 0 0% 100%));
+  border: 1px solid hsl(var(--border-300, 0 0% 85%));
+  box-shadow: 0 2px 8px hsl(0 0% 0% / 8%);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cpa-gutter:hover {
+  color: hsl(var(--text-100, 0 0% 12%));
+  border-color: hsl(var(--border-200, 0 0% 75%));
+}
+
+.cpa-gutter[hidden] {
+  display: none;
+}

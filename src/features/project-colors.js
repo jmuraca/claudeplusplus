@@ -103,9 +103,46 @@
       if (color) tintIcon(icon, color);
       else untintIcon(icon);
     }
+    decorateProjectCards(ctx);
     // Drop any floating dots left by earlier versions of this feature.
     var dots = document.querySelectorAll(".cpp-dot");
     for (var k = 0; k < dots.length; k++) dots[k].remove();
+  }
+
+  // ---- project-list cards -------------------------------------------------
+  // On the projects list (/cowork/projects) each card is an <a href=".../
+  // project/<uuid>"> with the project name in a .truncate div. Prepend a small
+  // colored circle before the name, tinted with that project's color.
+  function decorateProjectCards(ctx) {
+    var links = document.querySelectorAll('a[href*="/project/"]');
+    for (var i = 0; i < links.length; i++) {
+      var a = links[i];
+      // Sidebar/nav project entries already get a tinted leading icon.
+      if (a.closest("nav, aside")) continue;
+      var m = (a.getAttribute("href") || "").match(ctx.util.PROJECT_RE);
+      if (!m) continue;
+      var pid = m[1].toLowerCase();
+      var name = a.querySelector(".truncate");
+      if (!name || !name.parentNode) continue;
+
+      var color = colors[pid];
+      var dot = name.previousElementSibling;
+      if (!dot || !dot.classList || !dot.classList.contains("cpp-proj-dot")) {
+        dot = null;
+      }
+
+      if (!color) {
+        if (dot) dot.remove();
+        continue;
+      }
+      if (!dot) {
+        dot = document.createElement("span");
+        dot.className = "cpp-proj-dot";
+        dot.setAttribute("aria-hidden", "true");
+        name.parentNode.insertBefore(dot, name);
+      }
+      dot.style.background = color;
+    }
   }
 
   // ---- locate the header toolbar ------------------------------------------
@@ -347,7 +384,7 @@
       if (pop) pop.remove();
       var tinted = document.querySelectorAll(".cpp-tinted");
       for (var i = 0; i < tinted.length; i++) untintIcon(tinted[i]);
-      var dots = document.querySelectorAll(".cpp-dot");
+      var dots = document.querySelectorAll(".cpp-dot, .cpp-proj-dot");
       for (var j = 0; j < dots.length; j++) dots[j].remove();
     }
   });

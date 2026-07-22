@@ -19,6 +19,18 @@
           mask: var(--cpp-chat) center / 100% 100% no-repeat;
 }
 
+/* Colored circle before a project's name on the projects list (/cowork/
+   projects). Sits inline, left of the name, and doesn't shrink when the name
+   truncates. */
+.cpp-proj-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(128, 128, 128, 0.35) inset;
+}
+
 /* Header icon button (sits between the pin and the "..." menu).
    It borrows the neighbouring button's classes for sizing/hover, so we only
    need to lay out its inner dot. */

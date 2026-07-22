@@ -16,6 +16,20 @@ left sidebar, so you can tell at a glance which chat belongs to which project.
 - The color is applied to that project's chats in the sidebar.
 - Manage or clear saved colors from the toolbar popup.
 
+### 📁 Create project from a chat
+claude.ai's **Add to project** menu only lets you file a chat into a project that already
+exists. This adds a **+ Create new project** entry to that menu, so a loose `/chat/<uuid>`
+can go into a brand-new project in one step.
+
+- Pick it, name the project in the modal, and the extension creates the project and moves the
+  current chat into it — all through claude.ai's own API, nothing to watch happen. A toast
+  confirms when it's done.
+- The move is **verified**: it re-reads the conversation's `project_uuid` after writing (a
+  `200` alone doesn't prove the change stuck), trying a few request shapes until one takes.
+- claude's chat header won't re-render from an out-of-band API write, so that breadcrumb
+  catches up the next time you open the chat from the project — meanwhile the extension's own
+  project colors and list reflect the move right away.
+
 ### 🛡️ Delete guard
 Deleting a project on claude.ai also deletes **every chat, file, and artifact inside
 it**, but the built-in confirmation dialog doesn't say so and its **Delete** button is
@@ -42,6 +56,19 @@ Generation state is read from claude.ai's own completion **network stream**, not
 a backgrounded tab freezes its token rendering, so the DOM can't be trusted, but the stream
 still ends exactly when the response does. ✅/⚠️ are "needs attention" markers: they only
 appear for tabs that finished unattended and clear the moment you focus the tab.
+
+### 💬 Inline asides
+Select any passage in a chat and ask a question about it — the answer streams into a card in
+the right margin, anchored to the text, the way a comment sits beside a paragraph in a doc.
+
+- Selecting text adds an **Ask** button to claude's selection popover. Type a question and the
+  answer streams into a margin card pinned next to the highlight.
+- Each ask runs in its own **temporary (incognito) conversation**, so it stays out of your
+  chat history. Asides are saved locally per chat (`cppAsides:<uuid>`) and restored on reopen.
+- Highlights re-anchor as the transcript re-renders or is edited; asides whose message has
+  scrolled out of the render window collapse into a count in the margin gutter that jumps you
+  back to them.
+- Uses claude.ai's internal streaming API, which may change without notice.
 
 ### ⏸️ Draft mode
 Modeled on Claude Code's Shift+Tab mode switch. Press **Shift+Tab** in the message box

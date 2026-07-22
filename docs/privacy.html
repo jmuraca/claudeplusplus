@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — Claude++</title>
+  <meta name="description" content="Privacy policy for the Claude++ Chrome extension. Claude++ collects no data, uses local storage only, and sends nothing to any server." />
+  <style>
+    :root {
+      --bg: #faf9f7; --surface: #ffffff; --text: #1f1e1c; --muted: #6b6862;
+      --border: #e6e3dd; --accent: #d97757;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1917; --surface: #242320; --text: #f2f0ec; --muted: #a3a099;
+        --border: #35332e; --accent: #e08a6b;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #1a1917; --surface: #242320; --text: #f2f0ec; --muted: #a3a099;
+      --border: #35332e; --accent: #e08a6b;
+    }
+    :root[data-theme="light"] {
+      --bg: #faf9f7; --surface: #ffffff; --text: #1f1e1c; --muted: #6b6862;
+      --border: #e6e3dd; --accent: #d97757;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 56px 20px 72px; }
+    h1 { font-size: 2rem; letter-spacing: -.02em; margin: 0 0 4px; }
+    h1 .plus { color: var(--accent); }
+    .updated { color: var(--muted); font-size: .9rem; margin: 0 0 36px; }
+    h2 { font-size: 1.25rem; margin: 36px 0 10px; letter-spacing: -.01em; }
+    p, li { color: var(--text); }
+    .lead { font-size: 1.1rem; color: var(--muted); }
+    ul { padding-left: 22px; }
+    li { margin: 6px 0; }
+    a { color: var(--accent); }
+    code {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 1px 6px;
+      font-size: .9em;
+    }
+    .callout {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin: 20px 0;
+    }
+    .callout p { margin: 0; }
+    footer {
+      margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--border);
+      color: var(--muted); font-size: .85rem;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Privacy Policy — Claude<span class="plus">++</span></h1>
+    <p class="updated">Last updated: July 22, 2026</p>
+
+    <p class="lead">Claude++ is a browser extension that adds quality-of-life features to the claude.ai web interface. It is built so that your data never leaves your device.</p>
+
+    <div class="callout">
+      <p><strong>The short version:</strong> Claude++ collects no data, has no backend, has no analytics, and transmits nothing to us or to any third party. Everything it saves stays in your browser.</p>
+    </div>
+
+    <h2>What Claude++ stores</h2>
+    <p>To do its job, Claude++ saves a small amount of information locally in your browser using <code>chrome.storage.local</code>:</p>
+    <ul>
+      <li>Your per-project color choices.</li>
+      <li>Which features you have turned on or off.</li>
+      <li>Learned associations between your chats and the projects they belong to (used to color-code chats correctly).</li>
+      <li>Inline asides you create and their anchored text.</li>
+    </ul>
+    <p>This data is stored on your own computer. It is never sent to a server operated by us, and we have no ability to see it.</p>
+
+    <h2>What Claude++ does <em>not</em> do</h2>
+    <ul>
+      <li>It does not collect, transmit, or sell any personal data.</li>
+      <li>It does not use analytics, tracking, cookies, or advertising.</li>
+      <li>It does not run any server or backend of its own.</li>
+      <li>It does not read or store the content of your conversations beyond what is described above.</li>
+      <li>It does not use your data to determine creditworthiness or for lending.</li>
+    </ul>
+
+    <h2>Site access</h2>
+    <p>Claude++ requests access to <code>https://claude.ai/*</code> and no other websites. Its content scripts read and enhance the claude.ai page in your browser, and observe claude.ai’s own network responses locally in order to map chats to projects. This processing happens entirely on your device.</p>
+
+    <h2>Data shared with third parties</h2>
+    <p>None. Because Claude++ has no backend and transmits nothing, there is no data to share, sell, or disclose.</p>
+
+    <h2>Deleting your data</h2>
+    <p>When you delete a chat or project in claude.ai, anything Claude++ saved for it is deleted too. You can remove all of Claude++’s stored data at any time by removing the extension from your browser, which clears its local storage.</p>
+
+    <h2>Interaction with Anthropic and claude.ai</h2>
+    <p>Claude++ operates on top of the claude.ai interface. Your use of claude.ai itself is governed by Anthropic’s own privacy policy and terms, which are separate from this extension. Claude++ is an independent project and is not affiliated with, endorsed by, or operated by Anthropic.</p>
+
+    <h2>Changes to this policy</h2>
+    <p>If this policy changes, the “Last updated” date above will change with it. Material changes will be reflected here before they take effect for new versions of the extension.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about this policy or the extension can be raised on the project page at <a href="https://github.com/jmuraca/claudeplusplus">github.com/jmuraca/claudeplusplus</a>.</p>
+
+    <footer>
+      <p><a href="./index.html">← Back to Claude++</a></p>
+      <p>Not affiliated with Anthropic. “Claude” is a trademark of Anthropic; this is an independent, unofficial extension.</p>
+    </footer>
+  </div>
+</body>
+</html>

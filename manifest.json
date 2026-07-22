@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Claude++",
+  "version": "0.1.0",
+  "description": "A set of quality-of-life improvements for the claude.ai interface. First feature: color-code sidebar chats by project. Local storage only, no backend.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://claude.ai/*"],
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_title": "Claude++ Project Colors"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["src/inject-main.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["src/core.js", "src/features/project-colors.js"],
+      "css": ["styles/content.css"],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    }
+  ]
+}

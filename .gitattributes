@@ -1,0 +1,19 @@
+# Normalize line endings across Windows/WSL/Linux.
+# Store all text files with LF in the repo and check them out as LF,
+# so editing from Windows vs WSL no longer produces CRLF/LF diff churn.
+* text=auto eol=lf
+
+# Binary files: never touch their bytes.
+*.woff2 binary
+*.woff  binary
+*.ttf   binary
+*.otf   binary
+*.eot   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.pdf   binary
+*.zip   binary

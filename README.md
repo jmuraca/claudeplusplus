@@ -4,6 +4,9 @@ A Chrome extension with quality-of-life improvements for the **claude.ai** inter
 Everything is stored locally on your device (`chrome.storage.local`) — no account, no
 backend, nothing leaves the browser.
 
+<img width="1425" height="1082" alt="Screenshot 2026-07-22 184713" src="https://github.com/user-attachments/assets/8a14b9c1-05d6-4014-b766-cdff0c5f8873" />
+
+
 ## Features
 
 ### 🎨 Project colors

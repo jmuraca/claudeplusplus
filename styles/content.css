@@ -142,3 +142,48 @@
 #cpp-popover .cpp-clear:not(:disabled):hover {
   background: rgba(128, 128, 128, 0.18);
 }
+
+/* Delete-project confirmation guard (injected into claude.ai's delete dialog) */
+.cpp-del-guard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.cpp-del-warning {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #b54708;
+}
+
+.cpp-del-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.45);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.cpp-del-input:focus {
+  outline: 2px solid #e5484d;
+  outline-offset: -1px;
+}
+
+/* Held-closed Delete button — claude.ai styles its own :disabled, this just
+   makes the blocked state unmistakable. */
+.cpp-del-blocked {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cpp-del-warning {
+    color: #f5a524;
+  }
+}

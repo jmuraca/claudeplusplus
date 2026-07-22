@@ -7,6 +7,12 @@ var FEATURES = [
     name: "Project colors",
     description: "Color-code sidebar chats by project, with a picker in the project header.",
     defaultEnabled: true
+  },
+  {
+    id: "delete-guard",
+    name: "Delete project confirmation",
+    description: "Warns that deleting a project also deletes its chats, files, and artifacts, and requires typing the project name before the Delete button unlocks.",
+    defaultEnabled: true
   }
 ];
 

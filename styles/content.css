@@ -1,19 +1,22 @@
-/* A colored chat: its leading icon is tinted the project color. The color
-   itself is applied inline (as --cpp-tint) by the content script; these rules
-   just make sure it wins over the site's default icon color.
+/* A colored chat: its leading icon is filled the project color (applied inline
+   as --cpp-tint by the content script).
 
-   Icon-font glyphs fill via `color`. Outline SVG glyphs only expose their
-   stroke to `color` (that's the "border"), so we also force `fill`/`stroke`
-   on the icon and its paths — overriding any fill="none" — so the whole
-   shape reads as a solid color rather than just an outline. */
+   The chat icon is an outline icon-FONT glyph (Anthropicons U+E037) with no
+   filled variant — its axes are wght/opsz/ANIM/ANM2, no FILL — so `color`
+   alone can only recolor the outline the font draws ("the border"), and CSS
+   can't fill a font glyph's hollow interior.
+
+   So we hide the glyph (color: transparent) and repaint the icon box as a SOLID
+   fill: a background in the tint color, clipped to the glyph's EXACT outer
+   silhouette. That silhouette (--cpp-chat) was extracted from the real font
+   file with fontTools (outer contour of U+E037, flipped to SVG y-down), so the
+   shape matches the original icon precisely — just filled instead of outlined. */
 .cpp-tinted {
-  color: var(--cpp-tint, currentColor) !important;
-  fill: var(--cpp-tint, currentColor) !important;
-}
-
-.cpp-tinted * {
-  fill: var(--cpp-tint, currentColor) !important;
-  stroke: var(--cpp-tint, currentColor) !important;
+  --cpp-chat: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%201000%201000%27%3E%3Cpath%20transform%3D%27translate%280%201000%29%20scale%281%20-1%29%27%20d%3D%27M500%20878Q578%20878%20646.5%20848.5Q715%20819%20767.0%20767.0Q819%20715%20848.5%20646.5Q878%20578%20878%20500Q878%20422%20848.5%20357.0Q819%20292%20767.5%20245.0Q716%20198%20647.0%20172.5Q578%20147%20500%20147H150Q137%20147%20129.5%20155.0Q122%20163%20121.5%20174.5Q121%20186%20130%20195L230%20295Q222%20287%20222.0%20275.0Q222%20263%20230%20255Q180%20305%20151.0%20362.5Q122%20420%20122%20500Q122%20578%20151.5%20646.5Q181%20715%20233.0%20767.0Q285%20819%20353.5%20848.5Q422%20878%20500%20878Z%27%2F%3E%3C%2Fsvg%3E");
+  color: transparent !important;
+  background-color: var(--cpp-tint, currentColor) !important;
+  -webkit-mask: var(--cpp-chat) center / 100% 100% no-repeat;
+          mask: var(--cpp-chat) center / 100% 100% no-repeat;
 }
 
 /* Header icon button (sits between the pin and the "..." menu).

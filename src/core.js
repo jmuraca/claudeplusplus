@@ -30,15 +30,44 @@
       return all ? all[all.length - 1].toLowerCase() : null;
     },
 
-    // Convenience wrappers around chrome.storage.local.
+    // True while our extension context is alive. After the unpacked extension
+    // is reloaded/updated, an already-injected content script keeps running but
+    // every chrome.* call throws "Extension context invalidated"; chrome.runtime
+    // (and its .id) goes away, which we use to detect it.
+    contextAlive: function () {
+      try {
+        return !!(chrome.runtime && chrome.runtime.id);
+      } catch (e) {
+        return false;
+      }
+    },
+
+    // Convenience wrappers around chrome.storage.local. They resolve to a safe
+    // empty value (rather than throwing) once the context is gone.
     get: function (keys) {
       return new Promise(function (resolve) {
-        chrome.storage.local.get(keys, resolve);
+        if (!util.contextAlive()) return resolve({});
+        try {
+          chrome.storage.local.get(keys, function (d) {
+            void (chrome.runtime && chrome.runtime.lastError);
+            resolve(d || {});
+          });
+        } catch (e) {
+          resolve({});
+        }
       });
     },
     set: function (obj) {
       return new Promise(function (resolve) {
-        chrome.storage.local.set(obj, resolve);
+        if (!util.contextAlive()) return resolve();
+        try {
+          chrome.storage.local.set(obj, function () {
+            void (chrome.runtime && chrome.runtime.lastError);
+            resolve();
+          });
+        } catch (e) {
+          resolve();
+        }
       });
     }
   };
@@ -86,11 +115,33 @@
   }
 
   // ---- lifecycle ----------------------------------------------------------
+  var observer = null;
+  var deadCtx = false;
+
+  // Called once the extension context is gone (unpacked reload/update). Stop
+  // observing and let features remove whatever UI they added, so the stale
+  // script goes quiet instead of throwing on every mutation.
+  function shutdown() {
+    if (deadCtx) return;
+    deadCtx = true;
+    if (observer) {
+      try { observer.disconnect(); } catch (e) {}
+      observer = null;
+    }
+    features.forEach(function (f) {
+      if (f.onTeardown) {
+        try { f.onTeardown(ctx); } catch (e) {}
+      }
+    });
+  }
+
   var applyTimer = null;
   function scheduleApply() {
+    if (deadCtx) return;
     if (applyTimer) return;
     applyTimer = setTimeout(function () {
       applyTimer = null;
+      if (!util.contextAlive()) return shutdown();
       eachEnabled(function (f) {
         if (f.onApply) f.onApply(ctx);
       });
@@ -100,6 +151,7 @@
 
   // Network data relayed from inject-main.js (MAIN world).
   window.addEventListener("message", function (ev) {
+    if (deadCtx) return;
     if (ev.source !== window) return;
     var d = ev.data;
     if (!d || d.__cpp !== true) return;
@@ -144,8 +196,8 @@
         if (f.onInit) f.onInit(ctx);
       });
       scheduleApply();
-      var obs = new MutationObserver(scheduleApply);
-      obs.observe(document.documentElement, { childList: true, subtree: true });
+      observer = new MutationObserver(scheduleApply);
+      observer.observe(document.documentElement, { childList: true, subtree: true });
     });
   }
 

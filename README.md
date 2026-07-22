@@ -16,6 +16,19 @@ left sidebar, so you can tell at a glance which chat belongs to which project.
 - The color is applied to that project's chats in the sidebar.
 - Manage or clear saved colors from the toolbar popup.
 
+### 🛡️ Delete guard
+Deleting a project on claude.ai also deletes **every chat, file, and artifact inside
+it**, but the built-in confirmation dialog doesn't say so and its **Delete** button is
+live the moment the dialog opens. This feature hardens that dialog:
+
+- Retitles the heading to name the project being deleted.
+- Adds a warning that all project content (chats, files, artifacts) will be lost.
+- Requires you to type the project's exact name to confirm. Until it matches, the
+  **Delete** button stays disabled and a capture-phase click block keeps a stray click
+  or Enter from deleting anything — even if the app re-enables the button on a re-render.
+
+Works from both the projects list (`/cowork/projects`) and a single project's **⋯** menu.
+
 More features can be toggled on/off from the popup.
 
 ## Install (unpacked)

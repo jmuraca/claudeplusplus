@@ -18,7 +18,11 @@
     },
     {
       "matches": ["https://claude.ai/*"],
-      "js": ["src/core.js", "src/features/project-colors.js"],
+      "js": [
+        "src/core.js",
+        "src/features/project-colors.js",
+        "src/features/delete-guard.js"
+      ],
       "css": ["styles/content.css"],
       "run_at": "document_start",
       "world": "ISOLATED"

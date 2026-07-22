@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Claude++",
   "version": "0.1.0",
-  "description": "A set of quality-of-life improvements for the claude.ai interface. First feature: color-code sidebar chats by project. Local storage only, no backend.",
+  "description": "A set of quality-of-life improvements for the claude.ai interface. Local storage only, no backend.",
   "permissions": ["storage"],
   "host_permissions": ["https://claude.ai/*"],
   "action": {

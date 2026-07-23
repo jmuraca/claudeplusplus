@@ -106,6 +106,22 @@ Top to bottom: **jump to start**, **previous message you wrote**, **next message
 - Prev/next find your turns via claude.ai's `data-testid`, so if that ever changes those two
   simply no-op while start/most-recent keep working.
 
+### 💾 Download chat as XML
+Adds a **Download** button next to Share in the chat header. It saves the whole conversation
+as a single, structured XML file with a clean, machine-readable vocabulary.
+
+- Captures **roles and timestamps** plus rich content: headings, paragraphs, ordered/unordered
+  lists, tables, blockquotes, inline and block **code**, **bold**, *italic*, ~~strikethrough~~,
+  and links.
+- Pulls the full transcript from claude.ai's internal API (`rendering_mode=raw`), so **nothing
+  is missed in long, scrolled chats** — the on-screen DOM is virtualized and would drop
+  off-screen turns.
+- Follows the active thread only: because the API returns the full message *tree*, edited
+  prompts and regenerated replies leave abandoned branches behind — the export walks from the
+  current leaf back to the root so those don't leak in.
+- Saved as `<chat title>_YYYY-MM-DD.xml`. The button only appears on saved chats (where Share
+  exists) and reports loudly if the fetch fails, never corrupting the page.
+
 More features can be toggled on/off from the popup.
 
 ## Install (unpacked)

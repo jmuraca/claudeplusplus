@@ -27,9 +27,10 @@
         "src/features/tab-status.js",
         "src/features/asides.js",
         "src/features/scroll-nav.js",
-        "src/features/draft-mode.js"
+        "src/features/draft-mode.js",
+        "src/features/export-chat.js"
       ],
-      "css": ["styles/content.css", "styles/asides.css", "styles/draft-mode.css", "styles/scroll-nav.css"],
+      "css": ["styles/content.css", "styles/asides.css", "styles/draft-mode.css", "styles/scroll-nav.css", "styles/export-chat.css"],
       "run_at": "document_start",
       "world": "ISOLATED"
     }

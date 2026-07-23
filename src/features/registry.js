@@ -56,6 +56,13 @@
       defaultEnabled: true
     },
     {
+      id: "export-chat",
+      name: "Download chat as XML",
+      description:
+        "Adds a Download button next to Share in the chat header. Saves the whole conversation as a structured XML file — messages with roles and timestamps, and rich content (headings, paragraphs, lists, tables, blockquotes, inline/block code, bold, italic, links) in a clean, machine-readable vocabulary. Fetches the full transcript from claude.ai's internal API, so nothing is missed in long, scrolled chats.",
+      defaultEnabled: true
+    },
+    {
       id: "draft-mode",
       name: "Draft mode (Shift+Tab)",
       description:

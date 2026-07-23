@@ -1,0 +1,81 @@
+name: Release
+
+# Builds the packaged Chrome extension zip and publishes it to GitHub Releases.
+# Version numbers are the build date (yyyy.mm.dd), with a counter appended if
+# more than one release happens on the same day (yyyy.mm.dd.N).
+
+on:
+  # Auto-release whenever shippable extension files change on main.
+  push:
+    branches: [main]
+    paths:
+      - 'manifest.json'
+      - 'src/**'
+      - 'styles/**'
+      - 'icons/**'
+  # Manual "Run workflow" button in the Actions tab.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DATE=$(date -u +'%Y.%m.%d')
+          # Chrome manifest version components must not have leading zeros
+          # (e.g. use 2026.7.3, not 2026.07.03).
+          BASE_MANIFEST=$(date -u +'%Y.%-m.%-d')
+
+          TAG="v${DATE}"
+          MANIFEST_VERSION="$BASE_MANIFEST"
+          N=1
+          # Bump a 4th segment if a release already exists for today.
+          while gh release view "$TAG" >/dev/null 2>&1; do
+            N=$((N + 1))
+            TAG="v${DATE}.${N}"
+            MANIFEST_VERSION="${BASE_MANIFEST}.${N}"
+          done
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "manifest_version=$MANIFEST_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Releasing $TAG (manifest version $MANIFEST_VERSION)"
+
+      - name: Stamp manifest version
+        run: |
+          tmp=$(mktemp)
+          jq --arg v "${{ steps.version.outputs.manifest_version }}" \
+            '.version = $v' manifest.json > "$tmp"
+          mv "$tmp" manifest.json
+
+      - name: Build extension zip
+        run: |
+          zip -r claudeplusplus.zip \
+            manifest.json src styles icons \
+            -x '*.DS_Store'
+          unzip -l claudeplusplus.zip
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            claudeplusplus.zip \
+            --title "Claude++ ${{ steps.version.outputs.tag }}" \
+            --target "${{ github.sha }}" \
+            --notes "Automated build of the Claude++ Chrome extension.
+
+          **Install:**
+          1. Download \`claudeplusplus.zip\` below and unzip it.
+          2. Open \`chrome://extensions\` and enable **Developer mode**.
+          3. Click **Load unpacked** and select the unzipped folder.
+
+          The same zip can be uploaded to the Chrome Web Store dashboard."

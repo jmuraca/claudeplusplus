@@ -1,0 +1,7 @@
+# Local scratch / exported-chat artifacts (from the "Download chat as XML" feature
+# and its HTML predecessor) — these are personal exports, not source.
+claude-test-chat-*.html
+*_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].xml
+
+# Packaged build
+claudeplusplus.zip

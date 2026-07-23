@@ -10,7 +10,7 @@ Workflow & Planning
 
 SHORT DESCRIPTION (summary — 132 char limit)
 --------------------------------------------
-Quality-of-life upgrades for claude.ai: color-code chats by project, safer deletes, tab status, inline asides, and draft mode.
+Quality-of-life upgrades for claude.ai: color-code chats by project, safer deletes, tab status, asides, draft mode, XML export.
 
 
 DETAILED DESCRIPTION
@@ -38,6 +38,9 @@ Inspired by Claude Code's Shift+Tab. Press Shift+Tab in the message box to arm D
 ↕️ Scroll navigation buttons
 A small toolbar beside the scrollbar for getting around a long chat: jump to the start, to the previous message you wrote, to the next message you wrote, or to the most recent — no dragging required.
 
+💾 Download chat as XML
+Adds a Download button next to Share that saves the whole conversation as a structured XML file — roles, timestamps, and rich content (headings, lists, tables, code blocks, bold, italic, links) in a clean, machine-readable format. It fetches the full transcript, so nothing is missed in long chats, and follows only the active thread when prompts have been edited or replies regenerated.
+
 Privacy
 Claude++ stores everything locally with chrome.storage.local. It requires access to claude.ai only, collects no data, and sends nothing to any server. When you delete a chat or project, anything Claude++ saved for it is deleted too.
 
@@ -50,7 +53,7 @@ PRIVACY TAB FIELDS (dashboard requires these)
 
 SINGLE PURPOSE DESCRIPTION
 --------------------------
-Claude++ enhances the claude.ai web interface with quality-of-life features such as color-coding chats by project, guarding against accidental deletes, showing response status in the tab title, inline asides, a draft-composing mode, and scroll navigation buttons.
+Claude++ enhances the claude.ai web interface with quality-of-life features such as color-coding chats by project, guarding against accidental deletes, showing response status in the tab title, inline asides, a draft-composing mode, scroll navigation buttons, and downloading a chat as a structured XML file.
 
 PERMISSION JUSTIFICATION — "storage"
 ------------------------------------

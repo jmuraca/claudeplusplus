@@ -1,0 +1,31 @@
+/* Claude++ — Export / download chat button.
+ *
+ * The button borrows claude.ai's Share-button classes for its base look (see
+ * export-chat.js), so this file only adds what that can't give us: the
+ * icon+label layout and a busy state while the conversation is being fetched. */
+
+.cpp-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cpp-export-btn .cpp-export-label {
+  white-space: nowrap;
+}
+
+/* Busy: dim the button and spin the download glyph while fetching. */
+.cpp-export-btn.cpp-export-busy {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.cpp-export-btn.cpp-export-busy svg {
+  animation: cpp-export-spin 0.8s linear infinite;
+}
+
+@keyframes cpp-export-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

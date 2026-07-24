@@ -122,14 +122,52 @@ as a single, structured XML file with a clean, machine-readable vocabulary.
 - Saved as `<chat title>_YYYY-MM-DD.xml`. The button only appears on saved chats (where Share
   exists) and reports loudly if the fetch fails, never corrupting the page.
 
+### 📌 Prompt stash
+Somewhere to park a prompt you've written but don't want to send yet. Press **Ctrl+S**
+(**⌘S** on macOS) in the message box and the draft moves out of the composer into a card
+in the right margin; press **Ctrl+S** on an empty box — or click the card — to bring it back.
+
+- Stash a second prompt while one is already held and the two **swap**: the new text goes to
+  the card, the held text lands in the box, so one key cycles between two drafts.
+- The card's **×** discards the stash. It sits to the right of the composer — top-aligned and
+  the same height, wearing the composer's own border width, style, colour and corner radius,
+  all read from its live computed style so light/dark and any restyle follow automatically.
+  When the margin is too narrow it moves to just above the composer and sizes to its content.
+- One slot **per conversation**: a draft stays with the chat it was written in, and never
+  turns up in another one. It survives navigation and reloads, and other tabs open on the same
+  chat stay in sync. Deleting the chat reaps its stash.
+- Only on a saved chat (`/chat/<uuid>`), which is the only place there's a conversation to
+  stash into — on `/new` and on project pages the key is inert.
+- Ctrl+S is swallowed only while the message box has focus, so the browser's Save Page keeps
+  working everywhere else on claude.ai.
+- The composer is a ProseMirror editor that owns its DOM, so text is never written by
+  inserting nodes — the editor's contents are selected and edited through the browser's own
+  editing commands (a synthetic paste, falling back to `execCommand`), which ProseMirror
+  observes and folds into its document.
+
 More features can be toggled on/off from the popup.
 
-## Install (unpacked)
+## Install
+
+### From the Chrome Web Store
+
+Install from
+[the store listing](https://chromewebstore.google.com/detail/ejkciacghkjmblphbmfbbjmbiilfbgde),
+then open https://claude.ai. Content scripts are injected on navigation, so reload any
+claude.ai tab that was already open before you installed.
+
+### Unpacked (for development)
 
 1. Open `chrome://extensions`.
 2. Enable **Developer mode** (top-right).
 3. Click **Load unpacked** and select this folder.
 4. Open https://claude.ai and go to a project page.
+
+> **The store build and an unpacked build are two different extensions.** Chrome gives each
+> its own extension ID, and storage is namespaced per ID, so they share no settings and no
+> saved data — see [Storage is per extension ID](#storage-is-per-extension-id). Don't run both
+> at once either: each injects its own copy of the content scripts into claude.ai, and the two
+> will fight over the same DOM.
 
 ## How it works
 
@@ -164,10 +202,31 @@ observes them:
 | `projectColors`            | `{ [projectUuid]: "#rrggbb" }`        | user-chosen color per project    |
 | `convProject`              | `{ [conversationUuid]: projectUuid }` | learned chat→project mapping     |
 | `cppAsides:<conversationUuid>` | `[{ id, anchor, question, answer }]` | inline asides for one chat (one key per chat) |
+| `cppPromptStash:<conversationUuid>` | `string`                     | the stashed prompt for one chat (one key per chat) |
 | `cppFeatures`              | `{ [featureId]: boolean }`            | per-feature enable/disable       |
 
 Everything keyed by a chat or project uuid is reaped when that chat/project is
 deleted — see [Deletion cleanup](#deletion-cleanup) below.
+
+#### Storage is per extension ID
+
+`chrome.storage.local` is namespaced by extension ID, and Chrome assigns a different ID to an
+unpacked build than to the Web Store build. Every key in the table above therefore belongs to
+one specific install:
+
+- **Switching from an unpacked build to the store build starts from empty.** Project colors,
+  asides, the stashed prompt, and feature toggles do not carry over. Colors are the visible
+  one: `project-colors` is enabled by default and running fine, but with no `projectColors`
+  entries there is nothing to tint, so the sidebar looks untouched and the extension reads as
+  broken when it isn't.
+- **Uninstalling removes that install's data for good.** Chrome deletes an extension's storage
+  with the extension, so there is nothing to migrate afterwards. Re-pick colors on the new
+  install; `convProject` rebuilds itself from claude.ai's API traffic as you browse.
+- There is no export/import path today, and no supported way to copy storage between IDs.
+
+Worth knowing when debugging: `chrome.runtime.id` and `chrome.storage` answer from an
+extension's isolated world whether or not the content scripts in it ever ran. Their working is
+not evidence that `core.js` executed — check `typeof CPP` (set at `src/core.js:112`) for that.
 
 ### Deletion cleanup
 
@@ -192,7 +251,8 @@ posts `{ type: "delete", kind: "chat" | "project", id }`. `core.js` turns that i
 an `onDelete(info, ctx)` call on each enabled feature, and **cascades**:
 
 - **Chat deleted** → each feature drops what it keyed under that chat: `asides`
-  removes `cppAsides:<id>`; `project-colors` removes the `convProject[id]` mapping.
+  removes `cppAsides:<id>`; `prompt-stash` removes `cppPromptStash:<id>`;
+  `project-colors` removes the `convProject[id]` mapping.
 - **Project deleted** → `project-colors` removes `projectColors[id]`, drops every
   `convProject` row pointing at it, and **returns those chat ids**. core then fans
   each out as its own chat delete, so a feature that doesn't know project membership
@@ -236,6 +296,21 @@ Two limits worth knowing:
 3. Add its `{ id, name, description, defaultEnabled }` to the list in
    `src/features/registry.js` — the single source of truth core.js and the popup
    both read, so the toggle appears automatically.
+
+## Releasing
+
+`.github/workflows/release.yml` builds the packaged zip and publishes it to GitHub Releases on
+every push to `main` that touches `manifest.json`, `src/`, `styles/`, or `icons/`. It stamps
+the manifest version with the build date (`yyyy.m.d`, plus a fourth segment for a second
+release the same day) and zips `manifest.json src styles icons` from a clean checkout.
+
+To publish to the Web Store, upload the `claudeplusplus.zip` **asset from the GitHub release**.
+Do not upload a zip built by hand from the working tree — it will contain whatever is
+uncommitted and can easily be an older or half-finished build.
+
+Because the zip is built from a clean checkout, every file the manifest names must be committed.
+An uncommitted asset produces a zip whose manifest points at files that aren't in the archive,
+and the Web Store rejects that at upload validation rather than at build time.
 
 ## Notes / limitations
 

@@ -68,6 +68,13 @@
       description:
         "Press Shift+Tab in the message box to arm Draft mode: keep typing, attaching files, dictating, and switching models freely, with no way to submit by accident. The Send button turns into a blue Pause; press Shift+Tab again (or click it) to return to normal. Shift+Enter still inserts a newline.",
       defaultEnabled: true
+    },
+    {
+      id: "prompt-stash",
+      name: "Prompt stash (Ctrl+S)",
+      description:
+        "Press Ctrl+S (⌘S on macOS) in the message box to set a prompt aside: it leaves the composer and waits in a card beside it. Press Ctrl+S on an empty box (or click the card) to bring it back. Stash a second prompt while one is held and the two swap, so one key cycles between two drafts. The card's × discards it. One slot per conversation, kept across reloads — a draft stashed in a chat stays with that chat.",
+      defaultEnabled: true
     }
   ];
 })(typeof window !== "undefined" ? window : this);

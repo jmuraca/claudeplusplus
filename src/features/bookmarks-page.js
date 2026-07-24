@@ -610,7 +610,9 @@
   // ---------- lifecycle ----------
 
   function onStorageChanged(changes, area) {
-    if (area !== "local" || !pageEl) return;
+    // Bookmarks live in chrome.storage.sync now, so refresh on "sync" changes
+    // (from this or another machine) as well as any local writes.
+    if ((area !== "local" && area !== "sync") || !pageEl) return;
     var touched = Object.keys(changes).some(function (k) {
       return k.indexOf(BM_PREFIX) === 0;
     });

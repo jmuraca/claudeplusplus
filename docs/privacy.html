@@ -72,25 +72,29 @@
     <h1>Privacy Policy — Claude<span class="plus">++</span></h1>
     <p class="updated">Last updated: July 22, 2026</p>
 
-    <p class="lead">Claude++ is a browser extension that adds quality-of-life features to the claude.ai web interface. It is built so that your data never leaves your device.</p>
+    <p class="lead">Claude++ is a browser extension that adds quality-of-life features to the claude.ai web interface. It is built to keep your data private: it has no backend and no analytics of its own. Most of what it saves stays on your device, and a small set of your settings and bookmarks use Chrome's own sync so they follow you between your signed-in Chrome browsers.</p>
 
     <div class="callout">
-      <p><strong>The short version:</strong> Claude++ collects no data, has no backend, has no analytics, and transmits nothing to us or to any third party. Everything it saves stays in your browser.</p>
+      <p><strong>The short version:</strong> Claude++ collects no data, has no backend of its own, and has no analytics. It saves your settings and bookmarks using Chrome's built-in storage — and nothing is ever sent to us.</p>
     </div>
 
     <h2>What Claude++ stores</h2>
-    <p>To do its job, Claude++ saves a small amount of information locally in your browser using <code>chrome.storage.local</code>:</p>
+    <p>To do its job, Claude++ saves a small amount of information in your browser using Chrome's storage API. Some of it syncs across your Chrome browsers via <code>chrome.storage.sync</code>:</p>
     <ul>
       <li>Your per-project color choices.</li>
       <li>Which features you have turned on or off.</li>
-      <li>Learned associations between your chats and the projects they belong to (used to color-code chats correctly).</li>
-      <li>Inline asides you create and their anchored text.</li>
+      <li>The bookmarks you add within a conversation.</li>
     </ul>
-    <p>This data is stored on your own computer. It is never sent to a server operated by us, and we have no ability to see it.</p>
+    <p>The rest stays only on the device that created it, in <code>chrome.storage.local</code>:</p>
+    <ul>
+      <li>Learned associations between your chats and the projects they belong to (used to color-code chats correctly).</li>
+      <li>Inline asides you create and their anchored text, and any saved prompt drafts.</li>
+    </ul>
+    <p>None of this is ever sent to a server operated by us, and we have no ability to see it. The synced items are carried between your own browsers by Chrome's built-in sync, which is part of your Google/Chrome account and handled by Google under <a href="https://policies.google.com/privacy">Google's privacy policy</a> — not by us.</p>
 
     <h2>What Claude++ does <em>not</em> do</h2>
     <ul>
-      <li>It does not collect, transmit, or sell any personal data.</li>
+      <li>It does not collect or sell any personal data, and sends none to us or to any server of ours.</li>
       <li>It does not use analytics, tracking, cookies, or advertising.</li>
       <li>It does not run any server or backend of its own.</li>
       <li>It does not read or store the content of your conversations beyond what is described above.</li>
@@ -101,10 +105,10 @@
     <p>Claude++ requests access to <code>https://claude.ai/*</code> and no other websites. Its content scripts read and enhance the claude.ai page in your browser, and observe claude.ai’s own network responses locally in order to map chats to projects. This processing happens entirely on your device.</p>
 
     <h2>Data shared with third parties</h2>
-    <p>None. Because Claude++ has no backend and transmits nothing, there is no data to share, sell, or disclose.</p>
+    <p>Claude++ itself shares nothing — it has no backend and sends no data to us or to anyone we work with. The settings and bookmarks that use Chrome sync are transmitted and stored by Google as part of your own Chrome account, governed by Google's privacy policy, so that they reach your other signed-in browsers. We never receive that data and cannot see it.</p>
 
     <h2>Deleting your data</h2>
-    <p>When you delete a chat or project in claude.ai, anything Claude++ saved for it is deleted too. You can remove all of Claude++’s stored data at any time by removing the extension from your browser, which clears its local storage.</p>
+    <p>When you delete a chat or project in claude.ai, anything Claude++ saved for it is deleted too. You can remove all of Claude++’s stored data at any time by removing the extension from your browser, which clears both its local and its synced storage.</p>
 
     <h2>Interaction with Anthropic and claude.ai</h2>
     <p>Claude++ operates on top of the claude.ai interface. Your use of claude.ai itself is governed by Anthropic’s own privacy policy and terms, which are separate from this extension. Claude++ is an independent project and is not affiliated with, endorsed by, or operated by Anthropic.</p>

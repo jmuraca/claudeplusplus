@@ -5,12 +5,21 @@
 // to keep in sync here.
 var FEATURES = window.CPP_FEATURES || [];
 
+// The popup only ever touches cppFeatures and projectColors, both of which now
+// live in chrome.storage.sync so they follow the user across Chrome profiles.
 function get(keys) {
-  return new Promise(function (r) { chrome.storage.local.get(keys, r); });
+  return new Promise(function (r) { chrome.storage.sync.get(keys, r); });
 }
 function set(obj) {
-  return new Promise(function (r) { chrome.storage.local.set(obj, r); });
+  return new Promise(function (r) { chrome.storage.sync.set(obj, r); });
 }
+
+// The one-time .local→.sync migration is shared with core.js via CPP_SYNC
+// (storage-sync.js, loaded before this script). The popup runs it too so opening
+// it before ever visiting claude.ai still shows migrated config rather than
+// defaults; whichever context runs first migrates, the other sees the flag and
+// skips.
+var migrateToSync = window.CPP_SYNC.migrateToSync;
 
 function isEnabled(flags, f) {
   return Object.prototype.hasOwnProperty.call(flags, f.id)
@@ -105,7 +114,9 @@ document.getElementById("clear-colors").addEventListener("click", function () {
   set({ projectColors: {} }).then(function () { renderColors({}); });
 });
 
-get(["cppFeatures", "projectColors"]).then(function (d) {
+migrateToSync().then(function () {
+  return get(["cppFeatures", "projectColors"]);
+}).then(function (d) {
   renderFeatures(d.cppFeatures || {});
   renderColors(d.projectColors || {});
 });

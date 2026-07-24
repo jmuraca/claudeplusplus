@@ -1,8 +1,11 @@
 # Claude++
 
 A Chrome extension with quality-of-life improvements for the **claude.ai** interface.
-Everything is stored locally on your device (`chrome.storage.local`) — no account, no
-backend, nothing leaves the browser.
+Your settings and bookmarks follow you between your own Chrome browsers via Chrome's
+built-in sync (`chrome.storage.sync`); everything else stays on your device
+(`chrome.storage.local`). Claude++ has no account, no backend, and no analytics of its
+own — the only thing that leaves a device is what Chrome sync carries to your other
+signed-in browsers.
 
 <img width="1425" height="1082" alt="Screenshot 2026-07-22 184713" src="https://github.com/user-attachments/assets/8a14b9c1-05d6-4014-b766-cdff0c5f8873" />
 

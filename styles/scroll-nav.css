@@ -48,8 +48,9 @@
   cursor: default;
 }
 
-/* Nudge the paired-bar icons (start / most-recent) so their bar and chevron
-   read as one glyph rather than two stacked marks. */
-.cpp-scrollnav-btn svg {
-  display: block;
+/* Icons are Anthropicons glyphs (.cpp-icon carries the family; see
+   content.css). 20px matches the size the SVGs used to be drawn at, and keeps
+   these level with claude.ai's own composer icons. */
+.cpp-scrollnav-btn .cpp-icon {
+  font-size: 20px;
 }

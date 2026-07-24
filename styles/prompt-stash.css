@@ -15,28 +15,24 @@
   flex-direction: column;
   gap: 6px;
   padding: 10px 12px 9px;
-  border-radius: 14px;
-  background: hsl(var(--bg-000, 0 0% 100%));
-  border: 1px solid hsl(var(--border-300, 0 0% 85%));
-  box-shadow:
-    0 0.25rem 1.25rem hsl(var(--always-black, 0 0% 0%) / 7.5%),
-    0 0 0 0.5px hsl(var(--border-200, 0 0% 75%) / 0.3);
+  background: transparent;
+  border: 0;
   font-family: var(--font-ui, system-ui, -apple-system, sans-serif);
   color: hsl(var(--text-100, 0 0% 12%));
   cursor: pointer;
-  transition: border-color 0.14s ease, box-shadow 0.14s ease;
 }
 
 .cps-panel[hidden] {
   display: none;
 }
 
-/* Only the shadow lifts on hover: the border is set inline from the composer's
-   computed style (so the two edges always match), and inline wins the cascade. */
-.cps-panel:hover {
-  box-shadow:
-    0 0.35rem 1.4rem hsl(var(--always-black, 0 0% 0%) / 10%),
-    0 0 0 0.5px hsl(var(--border-200, 0 0% 75%) / 0.45);
+/* A modal (delete confirmation, settings…) drops a full-screen backdrop over the
+   page — claude draws it as an ::after on the dialog itself, at z-index:auto — so
+   the card, pinned far above claude's UI, would show straight through it. Hide it
+   the instant a dialog is in the DOM: :has() re-evaluates synchronously, whereas
+   toggling it from JS lags a frame behind the backdrop and flashes the card. */
+body:has([role="alertdialog"], [aria-modal="true"]) .cps-panel {
+  display: none;
 }
 
 .cps-head {
@@ -51,8 +47,17 @@
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: hsl(var(--text-500, 0 0% 55%));
+}
+
+/* Only "STASHED" is shouted; the restore hint stays in normal case so it reads
+   as an aside rather than part of the label. */
+.cps-title-label {
+  text-transform: uppercase;
+}
+
+.cps-title-hint {
+  font-weight: 400;
 }
 
 .cps-x {
@@ -83,35 +88,20 @@
   color: hsl(var(--text-100, 0 0% 12%));
 }
 
-/* Beside the composer the card is given the composer's exact height, so the text
-   takes whatever's left between the label and the hint and is cut off there —
-   faded out rather than sliced, so it reads as "there's more". Nothing is lost:
-   one click puts the whole prompt back in the box. */
+/* The card sizes to its content; a long draft is clamped and cut off with an
+   ellipsis so it never grows unbounded up the page. Nothing is lost: one click
+   puts the whole prompt back in the box. Eight lines is enough to recognise a
+   held draft at a glance without the card dominating the margin. */
 .cps-body {
-  flex: 1 1 auto;
   min-height: 0;
   font-size: 13px;
   line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   overflow: hidden;
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
-}
-
-/* Stacked above the composer there's no height to fill, so fall back to a line
-   clamp to keep the card from growing up the page. */
-.cps-panel.cps-above .cps-body {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 8;
-  -webkit-mask-image: none;
-  mask-image: none;
-}
-
-.cps-hint {
-  font-size: 11px;
-  color: hsl(var(--text-500, 0 0% 55%));
 }
 
 /* Stacked above the composer when the right margin is too narrow for it. */
@@ -127,11 +117,11 @@
 
 @keyframes cps-flash {
   0% {
-    border-color: hsl(var(--accent-main-100, 16 68% 45%));
+    color: hsl(var(--accent-main-100, 16 68% 45%));
     transform: scale(1.02);
   }
   100% {
-    border-color: hsl(var(--border-300, 0 0% 85%));
+    color: hsl(var(--text-100, 0 0% 12%));
     transform: scale(1);
   }
 }

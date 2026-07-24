@@ -244,14 +244,20 @@
     panel = document.createElement("div");
     panel.className = "cps-panel";
     panel.hidden = true;
-    panel.title = "Click (or press " + CHORD + ") to put this back in the message box";
 
     var head = document.createElement("div");
     head.className = "cps-head";
 
     var title = document.createElement("span");
     title.className = "cps-title";
-    title.textContent = "Stashed";
+    var titleLabel = document.createElement("span");
+    titleLabel.className = "cps-title-label";
+    titleLabel.textContent = "Stashed";
+    var titleHint = document.createElement("span");
+    titleHint.className = "cps-title-hint";
+    titleHint.textContent = " (" + CHORD + " to restore)";
+    title.appendChild(titleLabel);
+    title.appendChild(titleHint);
 
     var x = document.createElement("button");
     x.type = "button";
@@ -270,13 +276,8 @@
     bodyEl = document.createElement("div");
     bodyEl.className = "cps-body";
 
-    var hint = document.createElement("div");
-    hint.className = "cps-hint";
-    hint.textContent = CHORD + " to restore";
-
     panel.appendChild(head);
     panel.appendChild(bodyEl);
-    panel.appendChild(hint);
     panel.addEventListener("click", swap);
 
     document.body.appendChild(panel);
@@ -300,27 +301,13 @@
     place();
   }
 
-  // Wear the composer's own edge: same border width, style and colour, same
-  // corner radius. Read from the live computed style rather than copied into our
-  // stylesheet as literals, so light/dark, a token retune, or a restyled composer
-  // all follow with nothing to keep in sync. If claude ever draws that edge some
-  // other way (a ring shadow, say, with no real border), the inline values are
-  // cleared and prompt-stash.css's own border stands in.
-  function matchEdge(box) {
-    var cs = getComputedStyle(box);
-    var hasBorder = cs.borderTopStyle !== "none" && (parseFloat(cs.borderTopWidth) || 0) > 0;
-    panel.style.borderWidth = hasBorder ? cs.borderTopWidth : "";
-    panel.style.borderStyle = hasBorder ? cs.borderTopStyle : "";
-    panel.style.borderColor = hasBorder ? cs.borderTopColor : "";
-    panel.style.borderRadius = parseFloat(cs.borderTopLeftRadius) ? cs.borderTopLeftRadius : "";
-  }
-
   // Anchored to the live rect of the composer: to its right when the margin can
   // hold the card, otherwise stacked above it and right-aligned. In the side
-  // position the card's top lines up with the composer's top, so the two read as
-  // one row — meaning it rides upward with the composer as a multi-line draft
-  // grows it. The fallback position is bottom-anchored instead, since there the
-  // card sits on top of the composer rather than beside it.
+  // position the card's top lines up with the composer's top, so it reads as
+  // attached to it, riding upward with the composer as a multi-line draft grows.
+  // The fallback position is bottom-anchored instead, since there the card sits
+  // on top of the composer rather than beside it. (Hiding the card while a modal
+  // is open is done in CSS, not here — see prompt-stash.css.)
   function place() {
     if (!panel || !stash) return;
     var box = inputBox();
@@ -334,13 +321,11 @@
       return;
     }
 
-    matchEdge(box);
-
     var fits = r.right + GAP + CARD_W + EDGE <= window.innerWidth;
     panel.classList.toggle("cps-above", !fits);
-    // Beside the composer the card is the same height, so the two read as one
-    // row; stacked above it, it sizes to its content instead.
-    panel.style.height = fits ? Math.round(r.height) + "px" : "";
+    // The card sizes to its own content; a long draft is clamped with an
+    // ellipsis in CSS so it never grows unbounded up the page.
+    panel.style.height = "";
     // Only one of top/bottom is ever set; the other is cleared so a switch
     // between the two positions can't leave the card stretched between them.
     if (fits) {
@@ -370,10 +355,6 @@
     e.preventDefault();
     e.stopImmediatePropagation();
     swap();
-  }
-
-  function onResize() {
-    place();
   }
 
   // Keep the card glued to the composer when the composer moves for reasons core's
@@ -413,7 +394,7 @@
       if (started) return;
       started = true;
       window.addEventListener("keydown", onKeydownCapture, true);
-      window.addEventListener("resize", onResize);
+      window.addEventListener("resize", place);
       try {
         chrome.storage.onChanged.addListener(onStorageChanged);
       } catch (e) {
@@ -451,7 +432,7 @@
       convId = null;
       stash = "";
       window.removeEventListener("keydown", onKeydownCapture, true);
-      window.removeEventListener("resize", onResize);
+      window.removeEventListener("resize", place);
       try {
         chrome.storage.onChanged.removeListener(onStorageChanged);
       } catch (e) {}

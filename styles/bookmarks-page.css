@@ -1,0 +1,207 @@
+/* Claude++ — bookmarks page
+ *
+ * A fixed overlay on <body> (see bookmarks-page.js for why it isn't a real
+ * route). The header, search field, and Filter button are built from claude's
+ * own utility classes so they match the /recents page exactly; everything lives
+ * inside a .cds-root wrapper so those classes' design tokens resolve. This file
+ * only styles the bits that have no claude analog — the list rows, the ⋮/filter
+ * dropdown, and the page background. */
+
+.cpp-bmpage {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483010; /* above claude's modals/toasts (2147483001) */
+  overflow: auto;
+  background: #ffffff; /* base, so the scroll area never flashes transparent */
+  font-family: var(--font-ui, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif);
+}
+
+/* The theme scope + the actual page surface. White in light (as requested),
+   claude's app background in dark. Fills the viewport so the surface is solid
+   top to bottom. */
+.cpp-bmpage-cds {
+  min-height: 100%;
+  background: #ffffff;
+  color: #1a1a1a;
+  color: hsl(var(--text-100));
+}
+
+.cpp-bmpage-cds[data-mode="dark"] {
+  background: #262624;
+  background: hsl(var(--bg-100));
+}
+
+/* Sticky header block shares the page surface so rows scroll cleanly under it. */
+.cpp-bmpage-head {
+  z-index: 20;
+  background: inherit;
+}
+
+.cpp-bmpage-filtericon .cpp-icon {
+  font-size: 16px;
+}
+
+.cpp-bmpage-searchicon svg {
+  display: block;
+}
+
+/* List */
+.cpp-bmpage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+}
+
+.cpp-bmpage-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.cpp-bmpage-row:hover {
+  background: rgba(128, 128, 128, 0.12);
+  background: hsl(var(--bg-300));
+}
+
+.cpp-bmpage-row-icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  font-size: 16px;
+  color: hsl(var(--accent-brand, 15 63.1% 59.6%));
+}
+
+.cpp-bmpage-row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The bookmarked passage, clamped to two lines. */
+.cpp-bmpage-quote {
+  font-size: 14px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cpp-bmpage-chat {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6b7280;
+  color: hsl(var(--text-300));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Kebab: quiet until the row is hovered or it's focused. */
+.cpp-bmpage-kebab {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+
+.cpp-bmpage-row:hover .cpp-bmpage-kebab,
+.cpp-bmpage-kebab:focus-visible {
+  opacity: 0.7;
+}
+
+.cpp-bmpage-kebab:hover {
+  opacity: 1;
+  background: rgba(128, 128, 128, 0.18);
+}
+
+/* Dropdown — used by both the ⋮ row menu and the Filter button. A small surface
+   card, positioned in JS; scrolls when the chat list is long. */
+.cpp-bmpage-menu {
+  position: fixed;
+  z-index: 5;
+  min-width: 160px;
+  max-width: 320px;
+  max-height: min(60vh, 360px);
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: 10px;
+  background: #ffffff;
+  background: hsl(var(--bg-000));
+  border: 0.5px solid rgba(0, 0, 0, 0.12);
+  border: 0.5px solid hsl(var(--border-300));
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+}
+
+.cpp-bmpage-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.cpp-bmpage-menu-item:hover {
+  background: rgba(128, 128, 128, 0.15);
+}
+
+.cpp-bmpage-menu-danger {
+  color: #dc2626;
+}
+
+.cpp-bmpage-cds[data-mode="dark"] .cpp-bmpage-menu-danger {
+  color: #f87171;
+}
+
+.cpp-bmpage-empty {
+  padding: 48px 8px;
+  text-align: center;
+  font-size: 14px;
+  color: #6b7280;
+  color: hsl(var(--text-300));
+}
+
+/* Sidebar nav item — the row is a clone of claude's "Customize" entry, so it
+   inherits claude's classes; we only size our swapped-in bookmark glyph. Our
+   own row's selected look comes from its cloned data-[selected=focused] classes,
+   driven by the data-selected attribute we set in JS while on /bookmarks. */
+.cpp-bm-navicon {
+  font-size: 18px;
+}
+
+/* While the Bookmarks page is open, only our row should read as selected. Rather
+   than clear claude's own data-selected (React owns it), neutralize its selected
+   rows' highlight to match their resting state. Scoped to the sidebar, and our
+   own row is excluded by id. */
+body.cpp-bm-page-open .dframe-sidebar [data-row-main-button][data-selected]:not(#cpp-bm-navitem),
+body.cpp-bm-page-open .dframe-sidebar [data-row-main-button][aria-current]:not(#cpp-bm-navitem) {
+  background-color: transparent !important;
+  color: hsl(var(--text-300)) !important;
+}
+
+body.cpp-bm-page-open .dframe-sidebar [data-row-main-button][data-selected]:not(#cpp-bm-navitem) .df-leading-slot {
+  color: hsl(var(--text-300)) !important;
+}

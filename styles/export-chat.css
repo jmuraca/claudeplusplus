@@ -20,7 +20,7 @@
   cursor: progress;
 }
 
-.cpp-export-btn.cpp-export-busy svg {
+.cpp-export-btn.cpp-export-busy .cpp-icon {
   animation: cpp-export-spin 0.8s linear infinite;
 }
 

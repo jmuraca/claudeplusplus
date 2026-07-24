@@ -5,24 +5,19 @@
 // way a comment is anchored in Google Docs or Word.
 //
 // This is a port of the standalone reference implementation into Claude++'s
-// feature lifecycle. The engine (anchoring, cards, streaming) is unchanged; what
-// differs is the wiring:
+// feature lifecycle. The cards and streaming are unchanged; what differs is the
+// wiring:
 //   • all setup happens in onInit and is fully undone in onTeardown, so the
 //     feature toggle works and a context invalidation goes quiet cleanly;
 //   • DOM-churn re-resolution rides core's debounced onApply instead of a
 //     private MutationObserver;
 //   • storage goes through ctx.util.get/set (which no-op once the extension
 //     context is gone) rather than chrome.storage.local directly;
-//   • the current chat id comes from ctx.util.CHAT_RE.
-//
-// Two facts about claude.ai's transcript drive the engine:
-//   1. The message list is virtualized ([data-rocksteady-sizer] + one tall
-//      spacer), so an anchor is not a Range — a Range holds live text nodes and
-//      collapses the moment React unmounts or re-renders them. We store offsets
-//      plus the quoted text and re-resolve on demand.
-//   2. Layout is class-churn city, but structure is stable: .standard-markdown
-//      is the message body, [data-rs-index] is the only per-message id, and
-//      data-is-streaming says when a message has settled.
+//   • the current chat id comes from ctx.util.CHAT_RE;
+//   • anchoring — describing a selection, re-resolving it against a virtualized
+//     transcript, and seeking to a message — lives in src/anchor.js, shared
+//     with bookmarks. See that file for why an anchor is offsets and not a
+//     Range.
 //
 // Painting goes through the CSS Custom Highlight API rather than wrapping text in
 // <mark>: inserting nodes into React-owned DOM gets them discarded on the next
@@ -30,11 +25,7 @@
 (function () {
   "use strict";
 
-  var MD = ".standard-markdown";
-  var FEED = '[role="feed"]';
-  var SCROLLER = '[data-autoscroll-container="true"]';
-  var TOOLTIP = '[data-selection-tooltip="true"]';
-  var CTX = 30; // chars of prefix/suffix kept to disambiguate repeat quotes
+  var A = CPP.anchor;
 
   var HAS_HIGHLIGHT = typeof CSS !== "undefined" && "highlights" in CSS;
 
@@ -98,272 +89,6 @@
     return m ? m[1].toLowerCase() : null;
   }
 
-  function getOrgId() {
-    var m = /(?:^|;\s*)lastActiveOrg=([0-9a-f-]{8,})/i.exec(document.cookie);
-    return m ? m[1] : null;
-  }
-
-  // ---------- layout ----------
-  // Margin width is measured, never computed from Tailwind classes: the sidebar
-  // is user-resizable and claude.ai's own file pane can claim the right margin,
-  // so only the live rects tell the truth.
-
-  function layout() {
-    var feed = document.querySelector(FEED);
-    var sc = document.querySelector(SCROLLER);
-    if (!feed || !sc) return null;
-    var f = feed.getBoundingClientRect();
-    var s = sc.getBoundingClientRect();
-    return {
-      left: Math.round(f.left - s.left),
-      right: Math.round(s.right - f.right),
-      column: Math.round(f.width)
-    };
-  }
-
-  function mountedRange() {
-    var els = document.querySelectorAll("[data-rs-index]");
-    if (!els.length) return null;
-    var idx = Array.prototype.map
-      .call(els, function (e) { return +e.dataset.rsIndex; })
-      .sort(function (a, b) { return a - b; });
-    return { lo: idx[0], hi: idx[idx.length - 1], count: idx.length };
-  }
-
-  function scroller() {
-    return document.querySelector(SCROLLER);
-  }
-
-  // Seeking to an unmounted message can't use scrollIntoView — the node does not
-  // exist. Estimate from the height of the rows that *are* mounted, jump, let the
-  // virtualizer mount whatever lands there, and re-measure. Each pass lands
-  // closer because the local px-per-message estimate improves.
-  function scrollToMessage(msgIndex, tries) {
-    if (tries === undefined) tries = 10;
-    var sc = scroller();
-    if (!sc) return;
-
-    function step() {
-      var el = articleFor(msgIndex);
-      if (el) {
-        el.scrollIntoView({ block: "center", behavior: "smooth" });
-        return;
-      }
-      if (--tries <= 0) return;
-
-      var m = mountedRange();
-      var first = m && articleFor(m.lo);
-      var last = m && articleFor(m.hi);
-      if (!first || !last) return;
-
-      var fr = first.getBoundingClientRect();
-      var lr = last.getBoundingClientRect();
-      var sr = sc.getBoundingClientRect();
-      var avg = Math.max(1, (lr.bottom - fr.top) / (m.hi - m.lo + 1));
-
-      var before = sc.scrollTop;
-      sc.scrollTop += fr.top - sr.top + (msgIndex - m.lo) * avg - sc.clientHeight / 2;
-
-      if (Math.abs(sc.scrollTop - before) < 1) return;
-      requestAnimationFrame(step);
-    }
-
-    step();
-  }
-
-  // ---------- text offsets ----------
-  // Selections inside a code block span dozens of syntax-highlight <span>s, so
-  // offsets are always measured against the block's flattened textContent, never
-  // per text node.
-
-  /** Char offset of (node, offset) into container's flattened text. */
-  function offsetIn(container, node, offset) {
-    var walk = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-    var total = 0;
-    var n;
-    while ((n = walk.nextNode())) {
-      if (n === node) return total + offset;
-      total += n.nodeValue.length;
-    }
-    return -1;
-  }
-
-  /** Inverse of offsetIn: char offsets -> a live Range inside `block`. */
-  function rangeAt(block, start, end) {
-    var walk = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
-    var range = document.createRange();
-    var total = 0;
-    var open = false;
-    var n;
-    while ((n = walk.nextNode())) {
-      var len = n.nodeValue.length;
-      // `>` not `>=` so an offset sitting on a node boundary starts at the
-      // beginning of the next node rather than the tail of the previous one.
-      if (!open && total + len > start) {
-        range.setStart(n, start - total);
-        open = true;
-      }
-      if (open && total + len >= end) {
-        range.setEnd(n, end - total);
-        return range;
-      }
-      total += len;
-    }
-    return null;
-  }
-
-  /** The direct child of `root` that contains `node`. */
-  function blockOf(root, node) {
-    var el = node.nodeType === 1 ? node : node.parentElement;
-    while (el && el.parentElement !== root) el = el.parentElement;
-    return el;
-  }
-
-  // ---------- capture ----------
-
-  function describe(sel) {
-    if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
-    var range = sel.getRangeAt(0);
-
-    var md = range.startContainer.parentElement && range.startContainer.parentElement.closest(MD);
-    if (!md || !md.contains(range.endContainer)) return null;
-
-    // A message can hold several .standard-markdown blocks — Claude interleaves
-    // reasoning pills with prose — so record which one.
-    var article = md.closest("[data-rs-index]");
-    if (!article) return null;
-    var mdIndex = Array.prototype.indexOf.call(article.querySelectorAll(MD), md);
-
-    var block = blockOf(md, range.startContainer);
-    if (!block || block !== blockOf(md, range.endContainer)) return null;
-
-    var start = offsetIn(block, range.startContainer, range.startOffset);
-    var end = offsetIn(block, range.endContainer, range.endOffset);
-    if (start < 0 || end < 0 || end <= start) return null;
-
-    var text = block.textContent;
-    return {
-      convoId: convoId(),
-      msgIndex: +article.dataset.rsIndex,
-      mdIndex: mdIndex,
-      blockIndex: Array.prototype.indexOf.call(md.children, block),
-      start: start,
-      end: end,
-      quote: text.slice(start, end),
-      prefix: text.slice(Math.max(0, start - CTX), start),
-      suffix: text.slice(end, end + CTX)
-    };
-  }
-
-  /** Streaming messages append text continuously, so offsets taken mid-stream drift. */
-  function isSettled(node) {
-    var el = node && node.nodeType === 1 ? node : node && node.parentElement;
-    var wrap = el && el.closest("[data-is-streaming]");
-    return !wrap || wrap.dataset.isStreaming === "false";
-  }
-
-  // ---------- resolve ----------
-  //   exact   — offsets land and the text there still equals the quote
-  //   moved   — quote found elsewhere in the message; offsets rewritten
-  //   orphan  — quote is gone (message edited); the aside survives, detached
-  //   dormant — the message is outside the render window; comes back on scroll
-
-  function articleFor(msgIndex) {
-    return document.querySelector('[data-rs-index="' + msgIndex + '"]');
-  }
-
-  function blockFor(anchor, article) {
-    var md = article.querySelectorAll(MD)[anchor.mdIndex];
-    return md ? md.children[anchor.blockIndex] || null : null;
-  }
-
-  /** How many chars of context agree on each side — higher is a better match. */
-  function contextScore(text, at, anchor) {
-    var before = text.slice(Math.max(0, at - CTX), at);
-    var after = text.slice(at + anchor.quote.length, at + anchor.quote.length + CTX);
-    var n = 0;
-    while (
-      n < Math.min(before.length, anchor.prefix.length) &&
-      before[before.length - 1 - n] === anchor.prefix[anchor.prefix.length - 1 - n]
-    ) n++;
-    var m = 0;
-    while (m < Math.min(after.length, anchor.suffix.length) && after[m] === anchor.suffix[m]) m++;
-    return n + m;
-  }
-
-  /** Search a message for the quote, best context match wins. */
-  function relocate(anchor, article) {
-    var best = null;
-    var mds = article.querySelectorAll(MD);
-    for (var i = 0; i < mds.length; i++) {
-      var children = mds[i].children;
-      for (var j = 0; j < children.length; j++) {
-        var block = children[j];
-        var text = block.textContent;
-        var at = text.indexOf(anchor.quote);
-        while (at !== -1) {
-          var s = contextScore(text, at, anchor);
-          if (!best || s > best.score) best = { block: block, at: at, score: s };
-          at = text.indexOf(anchor.quote, at + 1);
-        }
-      }
-    }
-    return best;
-  }
-
-  /** How far either side of the recorded index to look after a renumbering. */
-  var DRIFT = 3;
-
-  /** Rewrite the stored anchor to wherever we just found the quote. */
-  function adopt(anchor, article, hit) {
-    var md = hit.block.closest(MD);
-    anchor.msgIndex = +article.dataset.rsIndex;
-    anchor.mdIndex = Array.prototype.indexOf.call(article.querySelectorAll(MD), md);
-    anchor.blockIndex = Array.prototype.indexOf.call(md.children, hit.block);
-    anchor.start = hit.at;
-    anchor.end = hit.at + anchor.quote.length;
-    return rangeAt(hit.block, anchor.start, anchor.end);
-  }
-
-  function resolve(anchor) {
-    var article = articleFor(anchor.msgIndex);
-
-    if (article) {
-      var block = blockFor(anchor, article);
-      if (block && block.textContent.slice(anchor.start, anchor.end) === anchor.quote) {
-        var range = rangeAt(block, anchor.start, anchor.end);
-        if (range) return { state: "exact", range: range };
-      }
-      var hit = relocate(anchor, article);
-      if (hit) {
-        var r2 = adopt(anchor, article, hit);
-        if (r2) return { state: "moved", range: r2 };
-      }
-    }
-
-    // Editing and resending an earlier message renumbers every data-rs-index
-    // after it, so a miss at the recorded index doesn't mean the text is gone.
-    // Widen outwards and stop at the first distance that matches — nearest wins,
-    // since a further match is more likely to be coincidental repetition.
-    for (var d = 1; d <= DRIFT; d++) {
-      var best = null;
-      var candidates = [anchor.msgIndex - d, anchor.msgIndex + d];
-      for (var k = 0; k < candidates.length; k++) {
-        var near = articleFor(candidates[k]);
-        if (!near) continue;
-        var h = relocate(anchor, near);
-        if (h && (!best || h.score > best.hit.score)) best = { near: near, hit: h };
-      }
-      if (best) {
-        var r3 = adopt(anchor, best.near, best.hit);
-        if (r3) return { state: "moved", range: r3 };
-      }
-    }
-
-    // No article means the virtualizer simply hasn't mounted it — not a failure.
-    return { state: article ? "orphan" : "dormant", range: null };
-  }
-
   // ---------- paint ----------
 
   var normal = HAS_HIGHLIGHT ? new Highlight() : null;
@@ -394,7 +119,7 @@
     if (active) active.clear();
 
     asides.forEach(function (aside) {
-      var res = resolve(aside.anchor);
+      var res = A.resolve(aside.anchor);
       aside.state = res.state;
       if (!res.range) return;
       ranges.set(aside.id, res.range);
@@ -451,7 +176,7 @@
       document.head.appendChild(shiftEl);
     }
     shiftEl.textContent = px
-      ? SCROLLER + "{padding-right:" + px + "px;transition:padding-right .18s ease}"
+      ? A.SCROLLER + "{padding-right:" + px + "px;transition:padding-right .18s ease}"
       : "";
     appliedShift = px;
   }
@@ -462,7 +187,7 @@
    * meaning P = 2 * (want - margin). Clamped so the left margin never collapses.
    */
   function plan() {
-    var l = layout();
+    var l = A.layout();
     if (!l) return null;
 
     // Measure back to the unshifted layout first. l.right already includes the
@@ -621,7 +346,7 @@
    */
   function reflow() {
     var p = plan();
-    var sc = scroller();
+    var sc = A.scroller();
     if (!p || !sc || !asides.size) {
       applyShift(0);
       if (layer) layer.hidden = true;
@@ -674,23 +399,8 @@
     return (el && el.textContent && el.textContent.trim()) || "";
   }
 
-  /**
-   * A bare quote is often unanswerable — "what does this mean" about a selected
-   * variable name needs the sentence around it. Pull a window from the same
-   * block, which is available whenever the message is mounted.
-   */
-  function contextFor(anchor) {
-    var article = articleFor(anchor.msgIndex);
-    var md = article && article.querySelectorAll(MD)[anchor.mdIndex];
-    var text = md && md.children[anchor.blockIndex] && md.children[anchor.blockIndex].textContent;
-    if (!text) return "";
-    var pad = 250;
-    var slice = text.slice(Math.max(0, anchor.start - pad), anchor.end + pad);
-    return slice === anchor.quote ? "" : slice;
-  }
-
   function buildPrompt(aside) {
-    var ctxWindow = contextFor(aside.anchor);
+    var ctxWindow = A.contextFor(aside.anchor);
     return [
       chatTitle() && "Conversation: " + chatTitle(),
       'Selected text:\n"""' + aside.anchor.quote + '"""',
@@ -723,7 +433,7 @@
    * is disposable and its ID is never stored.
    */
   function createTempConv() {
-    var org = getOrgId();
+    var org = ctx.util.getOrgId();
     if (!org) return Promise.reject(new Error("Not logged in (no org cookie)"));
 
     return fetch("/api/organizations/" + org + "/chat_conversations", {
@@ -809,7 +519,7 @@
   // streaming completion endpoint.
   // ===========================================================================
   async function askProvider(opts) {
-    var org = getOrgId();
+    var org = ctx.util.getOrgId();
     if (!org) throw new Error("Not logged in — cannot ask Claude");
 
     var asideConvId = await createTempConv();
@@ -933,7 +643,7 @@
       b.hidden = true;
       b.addEventListener("click", function () {
         var target = b.dataset.target;
-        if (target) scrollToMessage(+target);
+        if (target) A.scrollToMessage(+target);
       });
       document.body.appendChild(b);
       return b;
@@ -943,9 +653,9 @@
   }
 
   function renderGutter() {
-    var m = mountedRange();
-    var l = layout();
-    var sc = scroller();
+    var m = A.mountedRange();
+    var l = A.layout();
+    var sc = A.scroller();
 
     // Don't build the gutter DOM until there's something to put in it — an empty
     // conversation shouldn't add anything to the page. If it was built earlier
@@ -1142,12 +852,8 @@
   // from onApply + the mount-poll below — the button's presence is what keeps
   // repeated passes cheap and stops us stacking duplicates.
 
-  var ASK_ICON =
-    "M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24," +
-    "20.24l34.05-11.35A104,104,0,1,0,128,24Z";
-
   function injectAsk() {
-    var tip = document.querySelector(TOOLTIP);
+    var tip = document.querySelector(A.TOOLTIP);
     if (!tip) return;
     // Test for the button, not a marker flag: React can re-render the inner row
     // while keeping the outer tooltip node, which would leave a stale flag
@@ -1164,16 +870,10 @@
     ask.dataset.cpaAsk = "1";
     ask.append("Ask");
 
-    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("width", "1em");
-    svg.setAttribute("height", "1em");
-    svg.setAttribute("fill", "currentColor");
-    svg.setAttribute("viewBox", "0 0 256 256");
-    svg.setAttribute("aria-hidden", "true");
-    var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", ASK_ICON);
-    svg.appendChild(path);
-    ask.appendChild(svg);
+    // Reply's own icon is an Anthropicons glyph, so Ask uses one too — same
+    // font, inheriting the same size and weight from the shared className,
+    // which is the only way the two sit level with each other.
+    ask.appendChild(ctx.util.icon(ctx.util.ICON.ASK));
 
     var rule = document.createElement("div");
     rule.className = "cpa-tip-rule";
@@ -1184,42 +884,14 @@
       e.preventDefault();
       e.stopPropagation();
       var sel = window.getSelection();
-      if (!sel || sel.isCollapsed || !isSettled(sel.anchorNode)) return;
-      var anchor = describe(sel);
+      if (!sel || sel.isCollapsed || !A.isSettled(sel.anchorNode)) return;
+      var anchor = A.describe(sel);
       if (!anchor) return;
       openPopover(sel.getRangeAt(0), anchor);
     });
 
     row.prepend(rule);
     row.prepend(ask);
-  }
-
-  // claude.ai mounts its selection tooltip a beat *after* mouseup, and the exact
-  // frame varies. onApply catches most mounts and every re-render, but the very
-  // first mount can land between its passes — which is why a fresh selection
-  // sometimes showed Reply with no Ask. So on any selection we also poll for a
-  // short window until the tooltip appears and injection lands. injectAsk is
-  // idempotent, so the extra calls are cheap no-ops once Ask is in.
-  var injectTries = 0;
-  var injectTimer = null;
-  function chaseTooltip() {
-    injectAsk();
-    if (document.querySelector(TOOLTIP) || ++injectTries >= 20) {
-      clearInterval(injectTimer);
-      injectTimer = null;
-    }
-  }
-  function scheduleInject() {
-    // Only chase the tooltip when there's an actual text selection to act on.
-    // Both mouseup and selectionchange call this, so without the guard a plain
-    // click, or typing in our own popover input, would kick off a pointless 1s
-    // poll. The tooltip only appears for a non-collapsed selection anyway.
-    var sel = window.getSelection();
-    if (!sel || sel.isCollapsed) return;
-    injectTries = 0;
-    if (injectTimer) return;
-    injectTimer = setInterval(chaseTooltip, 50); // ~1s window, 20 tries
-    chaseTooltip();
   }
 
   // ---------- our own chrome, for the click handler and observers ----------
@@ -1271,6 +943,7 @@
   // ---------- lifecycle ----------
 
   var lastConvo = null;
+  var unsubTooltip = null;
 
   CPP.registerFeature({
     id: "asides",
@@ -1291,9 +964,8 @@
       });
 
       document.addEventListener("click", onDocClick);
-      document.addEventListener("mouseup", scheduleInject);
-      document.addEventListener("selectionchange", scheduleInject);
       document.addEventListener("keydown", onKeydown);
+      unsubTooltip = A.onSelectionTooltip(injectAsk);
       window.addEventListener("scroll", onScrollOrResize, true);
       window.addEventListener("resize", onScrollOrResize);
 
@@ -1339,12 +1011,10 @@
       closePopover();
 
       document.removeEventListener("click", onDocClick);
-      document.removeEventListener("mouseup", scheduleInject);
-      document.removeEventListener("selectionchange", scheduleInject);
       document.removeEventListener("keydown", onKeydown);
       window.removeEventListener("scroll", onScrollOrResize, true);
       window.removeEventListener("resize", onScrollOrResize);
-      if (injectTimer) { clearInterval(injectTimer); injectTimer = null; }
+      if (unsubTooltip) { unsubTooltip(); unsubTooltip = null; }
 
       // Remove anything we grafted into claude.ai's own tooltip.
       var stray = document.querySelectorAll("[data-cpa-ask], .cpa-tip-rule");

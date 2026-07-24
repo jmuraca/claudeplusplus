@@ -73,6 +73,33 @@ the right margin, anchored to the text, the way a comment sits beside a paragrap
   back to them.
 - Uses claude.ai's internal streaming API, which may change without notice.
 
+### 🔖 Bookmarks
+Margin bookmarks for a conversation, the way an editor does them. Select a passage, choose
+**Bookmark**, and it stays flagged until you clear it.
+
+- Selecting text adds a **Bookmark** button to claude's selection popover, beside **Ask**.
+- The text stays highlighted in claude's brand clay, and a matching bookmark glyph pins itself
+  in the **left margin** next to the first line. Click that glyph to clear it; bookmarking the
+  exact same passage again clears it too.
+- Saved locally per chat (`cppBookmarks:<uuid>`) and restored on reopen. Bookmarks re-anchor as
+  the transcript re-renders or is edited; one whose message has scrolled out of the render
+  window simply hides until you scroll back, since the text it marks is off screen anyway.
+- Purely local — no network calls, nothing sent anywhere.
+
+### 🔖 Bookmarks page
+The bookmarks above only show while you're in the chat that owns them. This adds one place to
+see them all, modeled on claude's own **Chats** page.
+
+- A **Bookmarks** entry appears in the left sidebar, under **Customize**. Clicking it opens a
+  full-page list (`/bookmarks`) of every bookmark across all your chats, each showing its
+  passage and the chat it belongs to.
+- A **search** box filters by passage text or chat name, and a **chat** dropdown narrows the
+  list to a single conversation.
+- Click a bookmark to open its chat and scroll straight to the passage. Each row's **⋮** menu
+  deletes that bookmark.
+- Chat names are read from claude's own conversations list; everything else comes from the
+  same on-device storage the Bookmarks feature writes, so there's nothing new to sync.
+
 ### ⏸️ Draft mode
 Modeled on Claude Code's Shift+Tab mode switch. Press **Shift+Tab** in the message box
 to arm **Draft mode**, where you can compose freely — type, paste, attach files, dictate,
@@ -195,6 +222,42 @@ observes them:
   scripts run in an isolated world and can't see the page's `fetch`/XHR results.
 - `core.js` runs in the isolated world where `chrome.storage` is available.
 
+### Anchoring text to a virtualized transcript
+
+Asides and bookmarks both have to pin something to a passage and find it again later,
+which is harder than it sounds: claude.ai virtualizes the message list, so a saved
+`Range` collapses the moment React unmounts the message it points into. `src/anchor.js`
+(loaded after `core.js`, exposed as `CPP.anchor`) is the shared engine for that. It
+stores an anchor as **character offsets plus the quoted text and ~30 chars of context
+either side**, then re-resolves on demand to one of four states:
+
+| State | Meaning |
+| ------- | -------------------------------------------------------------- |
+| `exact` | offsets still land on the quoted text |
+| `moved` | the quote was found elsewhere in the message; offsets rewritten |
+| `orphan` | the message is mounted but the quote is gone (it was edited) |
+| `dormant` | the message is outside the render window — comes back on scroll |
+
+`resolve()` rewrites the anchor **in place** when it reports `moved`, so a caller that
+persists anchors should save again after a pass that reported it. It also widens the
+search a few messages either side of the recorded index, because editing and resending
+an earlier message renumbers every `data-rs-index` after it.
+
+The module also owns the shared subscriber for claude.ai's selection tooltip
+(`onSelectionTooltip`), which is how **Ask** and **Bookmark** get into that popover —
+one poller for both, since they'd otherwise query the same node on the same frames.
+
+### Icons
+
+Chrome we add ourselves is drawn with **claude.ai's own icon font**, Anthropicons.
+Their stylesheet declares it document-wide (`@font-face { font-family:
+Anthropicons-Variable }`) with no `unicode-range`, so our elements can render its
+glyphs even though they hang off `<body>`. The glyphs sit at private-use codepoints
+and the font carries **no semantic glyph names** — every one is just `uniXXXX` — so
+`CPP.util.ICON` in `src/core.js` is the only record of what each codepoint draws.
+Use `CPP.util.icon(codepoint, rotate)` to build one; `styles/content.css` carries the
+`.cpp-icon` class.
+
 ### Storage keys
 
 | Key                        | Shape                                 | Purpose                          |
@@ -202,6 +265,9 @@ observes them:
 | `projectColors`            | `{ [projectUuid]: "#rrggbb" }`        | user-chosen color per project    |
 | `convProject`              | `{ [conversationUuid]: projectUuid }` | learned chat→project mapping     |
 | `cppAsides:<conversationUuid>` | `[{ id, anchor, question, answer }]` | inline asides for one chat (one key per chat) |
+| `cppBookmarks:<conversationUuid>` | `[{ id, anchor }]`                 | bookmarks for one chat (one key per chat) |
+| `cppChatNames`             | `{ [conversationUuid]: name }`        | cached chat titles for the bookmarks page |
+| `cppBookmarkGoto`          | `{ id, anchor }`                      | transient: scroll target handed to the chat page after clicking a bookmark |
 | `cppPromptStash:<conversationUuid>` | `string`                     | the stashed prompt for one chat (one key per chat) |
 | `cppFeatures`              | `{ [featureId]: boolean }`            | per-feature enable/disable       |
 
@@ -232,9 +298,10 @@ not evidence that `core.js` executed — check `typeof CPP` (set at `src/core.js
 
 Because storage is keyed by chat and project uuids, deleting a chat or project on
 claude.ai would otherwise orphan whatever we saved under it — the chat's asides and
-its `convProject` mapping, or a project's color. Those uuids are never reused, so
-orphans are inert rather than wrong, but the asides case is a real privacy concern:
-the question/answer text would outlive the chat it was about. So we reap on delete.
+bookmarks and its `convProject` mapping, or a project's color. Those uuids are never
+reused, so orphans are inert rather than wrong, but asides and bookmarks are a real
+privacy concern: both store text quoted out of the chat (and asides the answer too),
+which would outlive the chat it came from. So we reap on delete.
 
 The authoritative "it's really gone" signal is the successful `DELETE` claude.ai
 sends to the resource's own endpoint — it fires only on success, from whichever UI
@@ -289,8 +356,15 @@ Two limits worth knowing:
    });
    ```
 
-   `ctx.util` provides `currentProjectId()`, `convFromHref(href)`, the UUID regexes,
-   and promise-based `get(keys)` / `set(obj)` / `remove(keys)` storage helpers.
+   `ctx.util` (also reachable as the global `CPP.util`) provides
+   `currentProjectId()`, `currentChatId()`, `convFromHref(href)`, the UUID regexes,
+   `getOrgId()` (claude's active-org cookie, for the `/api/organizations/<org>/…`
+   endpoints) and `extractConversations(data)` (normalizes claude's conversation-list
+   response shapes), promise-based `get(keys)` / `set(obj)` / `remove(keys)` storage
+   helpers, and `icon(codepoint, rotate)` plus the `ICON` codepoint map for
+   Anthropicons glyphs. Reach for these before re-implementing them in a feature.
+   If the feature pins UI to a passage of chat text, use `CPP.anchor` rather than
+   rolling your own — see [Anchoring](#anchoring-text-to-a-virtualized-transcript).
 
 2. Add its file to `content_scripts[].js` in `manifest.json` (after `core.js`).
 3. Add its `{ id, name, description, defaultEnabled }` to the list in

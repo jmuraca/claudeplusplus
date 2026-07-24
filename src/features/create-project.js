@@ -18,28 +18,18 @@
 (function () {
   "use strict";
 
-  var CHAT_PATH_RE = /\/chat\/([0-9a-f-]{8,})/i;
-
   var modalEl = null;
   var toastEl = null;
 
-  // ---- ids ---------------------------------------------------------------
-  function getOrgId() {
-    var m = /(?:^|;\s*)lastActiveOrg=([0-9a-f-]{8,})/i.exec(document.cookie);
-    return m ? m[1] : null;
-  }
-
-  function currentChatId() {
-    var m = CHAT_PATH_RE.exec(location.pathname);
-    return m ? m[1].toLowerCase() : null;
-  }
+  // Org id and the current chat id come from the shared CPP.util (core.js). This
+  // feature keeps no ctx of its own, so it reaches them through the global.
 
   // ---- "Create new project" menu item ------------------------------------
   // The "Add to project" submenu is a portal with a "Search projects" input in
   // a pinned header. That input is the stable hook: when it appears, drop our
   // item into the same header, right under the search box.
   function injectMenuItem() {
-    if (!currentChatId()) return;
+    if (!CPP.util.currentChatId()) return;
     var inputs = document.querySelectorAll(
       'input[aria-label="Search projects"], input[placeholder="Search projects"]'
     );
@@ -185,13 +175,6 @@
     return p ? p.toLowerCase() : null;
   }
 
-  function extractConversations(data) {
-    if (Array.isArray(data)) return data;
-    if (data && Array.isArray(data.conversations)) return data.conversations;
-    if (data && Array.isArray(data.data)) return data.data;
-    return [];
-  }
-
   // The chat's current project, verified against the server. A direct GET can
   // 404 for some conversations, so fall back to the list endpoint.
   function fetchChatProject(org, chatId) {
@@ -207,7 +190,7 @@
           return res.ok ? res.json() : null;
         })
         .then(function (data) {
-          var convs = extractConversations(data);
+          var convs = CPP.util.extractConversations(data);
           var hit = null;
           for (var i = 0; i < convs.length; i++) {
             var id = ((convs[i].uuid || convs[i].id || "") + "").toLowerCase();
@@ -277,9 +260,9 @@
   }
 
   function createProject(name) {
-    var org = getOrgId();
+    var org = CPP.util.getOrgId();
     if (!org) return Promise.reject(new Error("Couldn't determine your organization."));
-    if (!currentChatId()) return Promise.reject(new Error("Open a chat first, then try again."));
+    if (!CPP.util.currentChatId()) return Promise.reject(new Error("Open a chat first, then try again."));
 
     return fetch("/api/organizations/" + org + "/projects",
       jsonInit("POST", { name: name, description: "", is_private: true })
@@ -298,8 +281,8 @@
   // Move the chat into the project via a silent, verified API call, then toast.
   // (Why we don't reload or refresh claude's header: see the file header.)
   function moveChatToProject(name, projectId) {
-    var org = getOrgId();
-    var chatId = currentChatId();
+    var org = CPP.util.getOrgId();
+    var chatId = CPP.util.currentChatId();
     if (!org || !chatId) return Promise.resolve();
     return assignChatToProject(org, chatId, projectId).then(function (moved) {
       if (moved) {

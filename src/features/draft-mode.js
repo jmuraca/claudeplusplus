@@ -29,11 +29,6 @@
 (function () {
   "use strict";
 
-  // Match either the composer wrapper or the editor itself. The value on the
-  // wrapper attribute isn't relied on ("[...]" without ="true") in case it ever
-  // varies, and the contenteditable is included directly so detection still
-  // works if the event's target resolves to the editor rather than the wrapper.
-  var COMPOSER = '[data-chat-input-container], [data-testid="chat-input"]';
   var DRAFT_CLASS = "cpp-draft";
 
   // The two composer buttons that draft mode takes over. They're mutually
@@ -59,18 +54,10 @@
   var lastPath = null;
   var started = false;
 
-  function within(node, sel) {
-    var el = node && node.nodeType === 1 ? node : node && node.parentElement;
-    return !!(el && el.closest && el.closest(sel));
-  }
-
-  // The Shift+Tab toggle is scoped to the composer so it keeps its normal
-  // focus-stepping job elsewhere. Check both the event target and the focused
-  // element: depending on where the keydown originates, one or the other is the
-  // reliable signal that the box has focus.
-  function inComposer(node) {
-    return within(node, COMPOSER) || within(document.activeElement, COMPOSER);
-  }
+  // The composer selector and the "is this the composer" test are shared in
+  // CPP.util (core.js), so draft-mode, prompt-stash and emoji-autocomplete key
+  // off the same source. The Shift+Tab toggle is scoped to the composer via
+  // CPP.util.inComposer so it keeps its normal focus-stepping job elsewhere.
 
   // ---- tooltip rewrite ----------------------------------------------------
   // claude's tooltips are base-ui popups portaled to <body> with role="tooltip",
@@ -182,7 +169,7 @@
       !e.ctrlKey &&
       !e.metaKey &&
       !e.altKey &&
-      inComposer(e.target)
+      CPP.util.inComposer(e.target)
     ) {
       e.preventDefault(); // hold focus in the box instead of stepping back
       e.stopImmediatePropagation();
@@ -196,7 +183,7 @@
     // it entirely rather than translate it, and leave Shift+Enter untouched so
     // the app still inserts a newline — that's the intended way to add lines
     // while drafting, and the DRAFT pill spells it out.
-    if (e.key === "Enter" && !e.shiftKey && within(e.target, COMPOSER)) {
+    if (e.key === "Enter" && !e.shiftKey && CPP.util.closest(e.target, CPP.util.COMPOSER_SEL)) {
       e.preventDefault();
       e.stopImmediatePropagation();
     }

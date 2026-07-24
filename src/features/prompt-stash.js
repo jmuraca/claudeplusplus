@@ -30,17 +30,8 @@
 (function () {
   "use strict";
 
-  // Match either the composer wrapper or the editor itself, same as draft-mode,
-  // so key handling works whichever the event target resolves to.
-  var COMPOSER = '[data-chat-input-container], [data-testid="chat-input"]';
-
-  // Candidates for the editable itself, most specific first.
-  var EDITOR_SELECTORS = [
-    '[data-chat-input-container] [contenteditable="true"]',
-    '[data-testid="chat-input"] [contenteditable="true"]',
-    '[contenteditable="true"][data-testid="chat-input"]',
-    'div.ProseMirror[contenteditable="true"]'
-  ];
+  // The composer selectors and the "is this the composer" / editable lookups are
+  // shared in CPP.util (core.js), same source as draft-mode and emoji-autocomplete.
 
   var STORE_PREFIX = "cppPromptStash:";
 
@@ -111,7 +102,7 @@
   // styling the composer that way.
   function inputBox() {
     var wrap = wrapper();
-    var ed = editor();
+    var ed = CPP.util.composerEditor();
     // Start above the editable: the surface is always an ancestor of it, and the
     // editable itself sits inset by the composer's padding.
     var node = ed && ed.parentElement;
@@ -125,23 +116,6 @@
       node = node.parentElement;
     }
     return wrap || ed;
-  }
-
-  function editor() {
-    for (var i = 0; i < EDITOR_SELECTORS.length; i++) {
-      var el = document.querySelector(EDITOR_SELECTORS[i]);
-      if (el) return el;
-    }
-    return null;
-  }
-
-  function within(node, sel) {
-    var el = node && node.nodeType === 1 ? node : node && node.parentElement;
-    return !!(el && el.closest && el.closest(sel));
-  }
-
-  function inComposer(node) {
-    return within(node, COMPOSER) || within(document.activeElement, COMPOSER);
   }
 
   // innerText, not textContent: it renders the block structure as newlines, so a
@@ -227,7 +201,7 @@
   // included), which covers stash, restore, and cycle without a mode.
   function swap() {
     if (!convId) return;
-    var ed = editor();
+    var ed = CPP.util.composerEditor();
     if (!ed) return;
     var current = readText(ed);
     if (!current && !stash) return;
@@ -348,7 +322,7 @@
     if (e.isComposing) return;
     if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
     if (e.key !== "s" && e.key !== "S") return;
-    if (!inComposer(e.target)) return;
+    if (!CPP.util.inComposer(e.target)) return;
     // Always swallow it inside the composer, even with nothing to do — off a
     // chat page there's no slot, so the key is inert: Ctrl+S there should never
     // drop the browser's Save Page dialog on the user.

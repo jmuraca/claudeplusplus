@@ -63,6 +63,13 @@
       defaultEnabled: true
     },
     {
+      id: "emoji-autocomplete",
+      name: "Emoji autocomplete",
+      description:
+        "Slack-style emoji in the message box. Finish a shortcode with its closing colon (:tada:) and it swaps to the emoji in place; or type a colon at a word boundary to open a picker at the cursor that narrows as you keep typing — ↑/↓ to move, Enter/Tab or click to insert. Uses a bundled shortcode set (the same ones GitHub and Slack use), so nothing is sent anywhere.",
+      defaultEnabled: true
+    },
+    {
       id: "scroll-nav",
       name: "Scroll navigation buttons",
       description:

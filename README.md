@@ -116,6 +116,22 @@ button) to return to normal.
 - The hover tooltip on those buttons is retitled while draft mode is on, and the state
   resets to normal when you switch chats.
 
+### 😀 Emoji autocomplete
+Slack-style emoji in the message box, driven off what you type between colons.
+
+- **Auto-replace**: finish a shortcode with its closing colon — `:tada:` — and it swaps to the
+  emoji (🎉) in place. `:+1:` → 👍, `:heart:` → ❤️. A `:word:` that isn't a known shortcode is
+  left exactly as typed.
+- **Picker**: type a colon at a word boundary (start of line or after a space) and a filtered
+  list opens at the cursor — a bare `:` shows a popular set, and each character you add narrows
+  it. **↑/↓** move, **Enter**/**Tab** or a click insert, **Esc** dismisses. It ranks exact
+  shortcode over prefix over substring, then falls back to keyword matches (so `:happy` finds
+  😀). Because the colon must sit at a word boundary, `http://x` and `time: 5` don't trigger it.
+- The shortcodes come from a bundled dataset (`src/data/emoji.js`, ~1,900 shortcodes generated
+  from GitHub's [gemoji](https://github.com/github/gemoji) — the same ones GitHub and Slack use),
+  so nothing is sent anywhere. Like the other composer features, edits go through the browser's
+  own editing commands on a selection rather than touching claude's ProseMirror DOM.
+
 ### ↕️ Scroll navigation buttons
 A small toolbar pinned beside the scrollbar for getting around a long chat without dragging.
 Top to bottom: **jump to start**, **previous message you wrote**, **next message you wrote**,

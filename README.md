@@ -133,8 +133,11 @@ in the right margin; press **Ctrl+S** on an empty box — or click the card — 
   the same height, wearing the composer's own border width, style, colour and corner radius,
   all read from its live computed style so light/dark and any restyle follow automatically.
   When the margin is too narrow it moves to just above the composer and sizes to its content.
-- One slot, stored globally: a draft stashed in one conversation can be restored in another,
-  and it survives navigation, reloads, and other tabs (they stay in sync).
+- One slot **per conversation**: a draft stays with the chat it was written in, and never
+  turns up in another one. It survives navigation and reloads, and other tabs open on the same
+  chat stay in sync. Deleting the chat reaps its stash.
+- Only on a saved chat (`/chat/<uuid>`), which is the only place there's a conversation to
+  stash into — on `/new` and on project pages the key is inert.
 - Ctrl+S is swallowed only while the message box has focus, so the browser's Save Page keeps
   working everywhere else on claude.ai.
 - The composer is a ProseMirror editor that owns its DOM, so text is never written by
@@ -199,7 +202,7 @@ observes them:
 | `projectColors`            | `{ [projectUuid]: "#rrggbb" }`        | user-chosen color per project    |
 | `convProject`              | `{ [conversationUuid]: projectUuid }` | learned chat→project mapping     |
 | `cppAsides:<conversationUuid>` | `[{ id, anchor, question, answer }]` | inline asides for one chat (one key per chat) |
-| `cppPromptStash`           | `string`                              | the one stashed prompt (global)  |
+| `cppPromptStash:<conversationUuid>` | `string`                     | the stashed prompt for one chat (one key per chat) |
 | `cppFeatures`              | `{ [featureId]: boolean }`            | per-feature enable/disable       |
 
 Everything keyed by a chat or project uuid is reaped when that chat/project is
@@ -248,7 +251,8 @@ posts `{ type: "delete", kind: "chat" | "project", id }`. `core.js` turns that i
 an `onDelete(info, ctx)` call on each enabled feature, and **cascades**:
 
 - **Chat deleted** → each feature drops what it keyed under that chat: `asides`
-  removes `cppAsides:<id>`; `project-colors` removes the `convProject[id]` mapping.
+  removes `cppAsides:<id>`; `prompt-stash` removes `cppPromptStash:<id>`;
+  `project-colors` removes the `convProject[id]` mapping.
 - **Project deleted** → `project-colors` removes `projectColors[id]`, drops every
   `convProject` row pointing at it, and **returns those chat ids**. core then fans
   each out as its own chat delete, so a feature that doesn't know project membership

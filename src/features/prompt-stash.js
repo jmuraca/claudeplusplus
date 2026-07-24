@@ -21,9 +21,12 @@
 // folds into its document. A synthetic paste is tried first (it round-trips
 // multi-line text in one step), with execCommand as the fallback.
 //
-// The stash is a single global slot rather than one per chat: it's a clipboard
-// for prompts, so a draft stashed in one conversation can be restored in
-// another, and it survives navigation and reloads.
+// The stash is per conversation: each /chat/<uuid> has its own slot, stored
+// under its own key the way asides.js stores its cards, so a draft parked in one
+// chat never surfaces in another and is reaped when that chat is deleted. It
+// survives navigation and reloads, and other tabs on the same chat follow it.
+// Pages with no conversation of their own — /new, a project's overview — have
+// nowhere to put a draft, so the feature is idle there.
 (function () {
   "use strict";
 
@@ -39,7 +42,11 @@
     'div.ProseMirror[contenteditable="true"]'
   ];
 
-  var STORE_KEY = "cppPromptStash";
+  var STORE_PREFIX = "cppPromptStash:";
+
+  function storeKey(id) {
+    return STORE_PREFIX + id;
+  }
 
   var CARD_W = 260;
   var GAP = 16; // between the card and the composer
@@ -52,11 +59,42 @@
 
   var ctx = null;
   var started = false;
-  var stash = ""; // the held prompt; "" means nothing stashed
+  var stash = ""; // the held prompt for `convId`; "" means nothing stashed
+  var convId = null; // the chat whose slot `stash` holds; null off a chat page
   var panel = null;
   var bodyEl = null;
   var ro = null; // ResizeObserver on the composer
   var roTarget = null; // the element `ro` is currently observing
+
+  // ---------- the chat ----------
+
+  // The conversation on screen, or null where there isn't one: /new hasn't been
+  // saved yet and a project page is not a chat, so neither has a slot to stash
+  // into. Read from the path, which is what claude rewrites on navigation.
+  function convoId() {
+    if (!ctx) return null;
+    var m = ctx.util.CHAT_RE.exec(location.pathname);
+    return m ? m[1].toLowerCase() : null;
+  }
+
+  // Point the live slot at the conversation on screen. Called on every apply,
+  // since an SPA navigation is just another DOM change to core; it's a no-op
+  // unless the id actually changed. The load is async and navigation can beat
+  // it, so the answer is dropped unless we're still on the chat it was for.
+  function syncChat() {
+    var id = convoId();
+    if (id === convId) return;
+    convId = id;
+    stash = "";
+    render();
+    if (!id || !ctx) return;
+    var key = storeKey(id);
+    ctx.util.get(key).then(function (d) {
+      if (convId !== id) return;
+      stash = (d && d[key]) || "";
+      render();
+    });
+  }
 
   // ---------- the composer ----------
 
@@ -172,9 +210,15 @@
   function setStash(text) {
     stash = text || "";
     render();
-    if (!ctx) return;
+    if (!ctx || !convId) return;
+    // An emptied slot is removed rather than stored as "", so a chat you've
+    // finished with leaves nothing behind.
+    if (!stash) {
+      ctx.util.remove(storeKey(convId));
+      return;
+    }
     var obj = {};
-    obj[STORE_KEY] = stash;
+    obj[storeKey(convId)] = stash;
     ctx.util.set(obj);
   }
 
@@ -182,6 +226,7 @@
   // text in the box goes to the slot and whatever was held comes back (empty
   // included), which covers stash, restore, and cycle without a mode.
   function swap() {
+    if (!convId) return;
     var ed = editor();
     if (!ed) return;
     var current = readText(ed);
@@ -319,8 +364,9 @@
     if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
     if (e.key !== "s" && e.key !== "S") return;
     if (!inComposer(e.target)) return;
-    // Always swallow it inside the composer, even with nothing to do: Ctrl+S
-    // there should never drop the browser's Save Page dialog on the user.
+    // Always swallow it inside the composer, even with nothing to do — off a
+    // chat page there's no slot, so the key is inert: Ctrl+S there should never
+    // drop the browser's Save Page dialog on the user.
     e.preventDefault();
     e.stopImmediatePropagation();
     swap();
@@ -345,11 +391,14 @@
     ro.observe(box);
   }
 
-  // Another tab stashing or restoring rewrites the same slot; follow it so the
-  // card on screen is never showing a prompt that's already been taken.
+  // Another tab open on the same chat stashing or restoring rewrites that
+  // chat's slot; follow it so the card on screen is never showing a prompt
+  // that's already been taken. Changes to other chats' slots aren't ours.
   function onStorageChanged(changes, area) {
-    if (area !== "local" || !changes[STORE_KEY]) return;
-    var next = changes[STORE_KEY].newValue || "";
+    if (area !== "local" || !convId) return;
+    var key = storeKey(convId);
+    if (!changes[key]) return;
+    var next = changes[key].newValue || "";
     if (next === stash) return;
     stash = next;
     render();
@@ -370,22 +419,37 @@
       } catch (e) {
         /* context already gone; core will shut us down */
       }
-      ctx.util.get(STORE_KEY).then(function (d) {
-        stash = (d && d[STORE_KEY]) || "";
-        render();
-      });
+      // The slot used to be a single global one under this key; nothing reads
+      // it now, so clear it rather than leave it in storage forever.
+      ctx.util.remove("cppPromptStash");
+      syncChat();
     },
 
-    // Core calls this (debounced) on DOM churn and SPA navigation. The composer is
-    // re-mounted constantly, so re-point the ResizeObserver and re-measure.
+    // Core calls this (debounced) on DOM churn and SPA navigation. Pick up a
+    // move to another chat, and — since the composer is re-mounted constantly —
+    // re-point the ResizeObserver and re-measure.
     onApply: function () {
+      syncChat();
       if (!stash) return;
       watchComposer();
       place();
     },
 
+    // Drop a deleted chat's slot, and the card with it if that chat is the one
+    // on screen.
+    onDelete: function (info) {
+      if (!info || info.kind !== "chat" || !ctx) return;
+      ctx.util.remove(storeKey(info.id));
+      if (info.id === convId) {
+        stash = "";
+        render();
+      }
+    },
+
     onTeardown: function () {
       started = false;
+      convId = null;
+      stash = "";
       window.removeEventListener("keydown", onKeydownCapture, true);
       window.removeEventListener("resize", onResize);
       try {

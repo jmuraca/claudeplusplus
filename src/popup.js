@@ -5,11 +5,49 @@
 // to keep in sync here.
 var FEATURES = window.CPP_FEATURES || [];
 
+// The popup only ever touches cppFeatures and projectColors, both of which now
+// live in chrome.storage.sync so they follow the user across Chrome profiles.
 function get(keys) {
-  return new Promise(function (r) { chrome.storage.local.get(keys, r); });
+  return new Promise(function (r) { chrome.storage.sync.get(keys, r); });
 }
 function set(obj) {
-  return new Promise(function (r) { chrome.storage.local.set(obj, r); });
+  return new Promise(function (r) { chrome.storage.sync.set(obj, r); });
+}
+
+// Mirror of core.js migrateToSync (see the note there): a one-time move of the
+// synced allow-list from .local into .sync, guarded by a device-local flag. The
+// popup runs it too so opening it before ever visiting claude.ai still shows the
+// migrated config rather than defaults. Whichever runs first migrates; the other
+// sees the flag and skips. Kept in step with core.js's SYNC_KEYS/SYNC_PREFIXES.
+function migrateToSync() {
+  function isSyncKey(k) {
+    return k === "cppFeatures" || k === "projectColors" ||
+      k.indexOf("cppBookmarks:") === 0;
+  }
+  return new Promise(function (resolve) {
+    chrome.storage.local.get(["cppSyncMigrated"], function (flag) {
+      if (flag && flag.cppSyncMigrated) return resolve();
+      chrome.storage.local.get(null, function (all) {
+        all = all || {};
+        var move = {};
+        var keys = [];
+        Object.keys(all).forEach(function (k) {
+          if (k !== "cppSyncMigrated" && isSyncKey(k)) {
+            move[k] = all[k];
+            keys.push(k);
+          }
+        });
+        var markDone = function () {
+          chrome.storage.local.set({ cppSyncMigrated: true }, function () { resolve(); });
+        };
+        if (!keys.length) return markDone();
+        chrome.storage.sync.set(move, function () {
+          if (chrome.runtime && chrome.runtime.lastError) return resolve();
+          chrome.storage.local.remove(keys, function () { markDone(); });
+        });
+      });
+    });
+  });
 }
 
 function isEnabled(flags, f) {
@@ -105,7 +143,9 @@ document.getElementById("clear-colors").addEventListener("click", function () {
   set({ projectColors: {} }).then(function () { renderColors({}); });
 });
 
-get(["cppFeatures", "projectColors"]).then(function (d) {
+migrateToSync().then(function () {
+  return get(["cppFeatures", "projectColors"]);
+}).then(function (d) {
   renderFeatures(d.cppFeatures || {});
   renderColors(d.projectColors || {});
 });

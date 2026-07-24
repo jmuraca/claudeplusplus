@@ -341,7 +341,10 @@
         apply(ctx);
       });
       chrome.storage.onChanged.addListener(function (changes, area) {
-        if (area !== "local") return;
+        // projectColors syncs across profiles (area "sync"); convProject stays
+        // device-local. Each event carries keys from only its own area, so the
+        // per-key blocks below stay correct.
+        if (area !== "local" && area !== "sync") return;
         if (changes.projectColors) {
           colors = changes.projectColors.newValue || {};
           apply(ctx);

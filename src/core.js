@@ -12,6 +12,108 @@
 
   var UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
+  // ---- storage routing ----------------------------------------------------
+  // Most state stays device-local, but a small allow-list follows the user
+  // across their Chrome profiles via chrome.storage.sync: the feature toggles,
+  // project colors, and per-conversation bookmarks. Everything else (asides,
+  // prompt stash, title caches, device ids) is bulky or device-scoped and stays
+  // on .local to avoid sync's ~100KB / 8KB-per-item / 512-item quotas. The
+  // util.get/set/remove wrappers below route each key to its home area, so
+  // feature code keeps calling ctx.util unchanged.
+  var SYNC_KEYS = { cppFeatures: 1, projectColors: 1 };
+  var SYNC_PREFIXES = ["cppBookmarks:"];
+  function isSyncKey(k) {
+    if (SYNC_KEYS[k]) return true;
+    for (var i = 0; i < SYNC_PREFIXES.length; i++) {
+      if (k.indexOf(SYNC_PREFIXES[i]) === 0) return true;
+    }
+    return false;
+  }
+  function areaFor(k) {
+    return isSyncKey(k) ? chrome.storage.sync : chrome.storage.local;
+  }
+  function rawGet(area, query) {
+    return new Promise(function (resolve) {
+      try {
+        area.get(query, function (d) {
+          void (chrome.runtime && chrome.runtime.lastError);
+          resolve(d || {});
+        });
+      } catch (e) {
+        resolve({});
+      }
+    });
+  }
+  function rawSet(area, obj) {
+    return new Promise(function (resolve) {
+      try {
+        area.set(obj, function () {
+          void (chrome.runtime && chrome.runtime.lastError);
+          resolve();
+        });
+      } catch (e) {
+        resolve();
+      }
+    });
+  }
+  function rawRemove(area, keys) {
+    return new Promise(function (resolve) {
+      try {
+        area.remove(keys, function () {
+          void (chrome.runtime && chrome.runtime.lastError);
+          resolve();
+        });
+      } catch (e) {
+        resolve();
+      }
+    });
+  }
+
+  // One-time move of the synced allow-list from .local (where older versions
+  // kept everything) into chrome.storage.sync. Guarded by a device-local flag
+  // so it runs at most once per profile. If sync.set fails (over quota / sync
+  // disabled) we leave the local copies untouched and skip the flag, so a later
+  // load retries — data is never removed from local until sync has it.
+  function migrateToSync() {
+    return new Promise(function (resolve) {
+      try {
+        chrome.storage.local.get(["cppSyncMigrated"], function (flag) {
+          void (chrome.runtime && chrome.runtime.lastError);
+          if (flag && flag.cppSyncMigrated) return resolve();
+          chrome.storage.local.get(null, function (all) {
+            void (chrome.runtime && chrome.runtime.lastError);
+            all = all || {};
+            var move = {};
+            var keys = [];
+            Object.keys(all).forEach(function (k) {
+              if (k === "cppSyncMigrated") return;
+              if (isSyncKey(k)) {
+                move[k] = all[k];
+                keys.push(k);
+              }
+            });
+            var markDone = function () {
+              chrome.storage.local.set({ cppSyncMigrated: true }, function () {
+                void (chrome.runtime && chrome.runtime.lastError);
+                resolve();
+              });
+            };
+            if (!keys.length) return markDone();
+            chrome.storage.sync.set(move, function () {
+              if (chrome.runtime && chrome.runtime.lastError) return resolve();
+              chrome.storage.local.remove(keys, function () {
+                void (chrome.runtime && chrome.runtime.lastError);
+                markDone();
+              });
+            });
+          });
+        });
+      } catch (e) {
+        resolve();
+      }
+    });
+  }
+
   var util = {
     UUID_G: new RegExp(UUID, "gi"),
     PROJECT_RE: new RegExp("/project/(" + UUID + ")", "i"),
@@ -104,46 +206,84 @@
       }
     },
 
-    // Convenience wrappers around chrome.storage.local. They resolve to a safe
+    // Convenience wrappers over chrome.storage. Each key is routed to its home
+    // area (sync for the allow-list, local otherwise — see isSyncKey), then the
+    // results are merged so callers see one flat store. They resolve to a safe
     // empty value (rather than throwing) once the context is gone.
     get: function (keys) {
-      return new Promise(function (resolve) {
-        if (!util.contextAlive()) return resolve({});
-        try {
-          chrome.storage.local.get(keys, function (d) {
-            void (chrome.runtime && chrome.runtime.lastError);
-            resolve(d || {});
-          });
-        } catch (e) {
-          resolve({});
+      if (!util.contextAlive()) return Promise.resolve({});
+      // Whole-store read (e.g. the bookmarks page): merge both areas, with sync
+      // winning on any overlap so a migrated key never reads a stale local copy.
+      if (keys == null) {
+        return Promise.all([
+          rawGet(chrome.storage.sync, null),
+          rawGet(chrome.storage.local, null),
+        ]).then(function (r) {
+          return Object.assign({}, r[1], r[0]);
+        });
+      }
+      // Single key → its home area.
+      if (typeof keys === "string") {
+        return rawGet(areaFor(keys), keys);
+      }
+      // Array of keys, or object of {key: default}: partition by home area,
+      // preserving defaults, then merge. A key lives in exactly one area, so
+      // defaults are never lost.
+      var isArr = Array.isArray(keys);
+      var syncQ = isArr ? [] : {};
+      var localQ = isArr ? [] : {};
+      var syncN = 0;
+      var localN = 0;
+      (isArr ? keys : Object.keys(keys)).forEach(function (k) {
+        if (isSyncKey(k)) {
+          if (isArr) syncQ.push(k);
+          else syncQ[k] = keys[k];
+          syncN++;
+        } else {
+          if (isArr) localQ.push(k);
+          else localQ[k] = keys[k];
+          localN++;
         }
+      });
+      return Promise.all([
+        syncN ? rawGet(chrome.storage.sync, syncQ) : Promise.resolve({}),
+        localN ? rawGet(chrome.storage.local, localQ) : Promise.resolve({}),
+      ]).then(function (r) {
+        return Object.assign({}, r[0], r[1]);
       });
     },
     set: function (obj) {
-      return new Promise(function (resolve) {
-        if (!util.contextAlive()) return resolve();
-        try {
-          chrome.storage.local.set(obj, function () {
-            void (chrome.runtime && chrome.runtime.lastError);
-            resolve();
-          });
-        } catch (e) {
-          resolve();
+      if (!util.contextAlive()) return Promise.resolve();
+      var syncObj = {};
+      var localObj = {};
+      var hasSync = false;
+      var hasLocal = false;
+      Object.keys(obj || {}).forEach(function (k) {
+        if (isSyncKey(k)) {
+          syncObj[k] = obj[k];
+          hasSync = true;
+        } else {
+          localObj[k] = obj[k];
+          hasLocal = true;
         }
       });
+      return Promise.all([
+        hasSync ? rawSet(chrome.storage.sync, syncObj) : Promise.resolve(),
+        hasLocal ? rawSet(chrome.storage.local, localObj) : Promise.resolve(),
+      ]).then(function () {});
     },
     remove: function (keys) {
-      return new Promise(function (resolve) {
-        if (!util.contextAlive()) return resolve();
-        try {
-          chrome.storage.local.remove(keys, function () {
-            void (chrome.runtime && chrome.runtime.lastError);
-            resolve();
-          });
-        } catch (e) {
-          resolve();
-        }
+      if (!util.contextAlive()) return Promise.resolve();
+      var list = Array.isArray(keys) ? keys : [keys];
+      var syncList = [];
+      var localList = [];
+      list.forEach(function (k) {
+        (isSyncKey(k) ? syncList : localList).push(k);
       });
+      return Promise.all([
+        syncList.length ? rawRemove(chrome.storage.sync, syncList) : Promise.resolve(),
+        localList.length ? rawRemove(chrome.storage.local, localList) : Promise.resolve(),
+      ]).then(function () {});
     },
 
     // ---- Anthropicons -----------------------------------------------------
@@ -314,9 +454,10 @@
     }
   });
 
-  // React to settings changes made from the popup.
+  // React to settings changes made from the popup — or, since cppFeatures now
+  // lives in chrome.storage.sync, from another machine on the same account.
   chrome.storage.onChanged.addListener(function (changes, area) {
-    if (area !== "local") return;
+    if (area !== "local" && area !== "sync") return;
     if (changes.cppFeatures) {
       var prev = {};
       for (var id in enabled) prev[id] = enabled[id];
@@ -340,7 +481,11 @@
   function start() {
     if (started) return;
     started = true;
-    util.get(["cppFeatures"]).then(function (d) {
+    // Move any pre-sync config/bookmarks into chrome.storage.sync before the
+    // first read, so a fresh profile picks them up rather than showing defaults.
+    migrateToSync().then(function () {
+      return util.get(["cppFeatures"]);
+    }).then(function (d) {
       enabled = d.cppFeatures || {};
       eachEnabled(function (f) {
         if (f.onInit) f.onInit(ctx);

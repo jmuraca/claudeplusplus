@@ -1,0 +1,100 @@
+/* Claude++ — bookmarks
+ *
+ * The marker layer lives on <body>, outside React's tree, so claude.ai
+ * re-renders can't wipe it. That's why everything here is position:fixed
+ * rather than anchored into the transcript. */
+
+/* Bookmarked text, tinted with claude.ai's brand colour (clay, the same
+   --accent-brand the Send button fills with) so a bookmark reads as a
+   first-class claude action. The token is HSL components under every theme
+   scope that reaches this far down the tree, so it's safe inside hsl(); the
+   literal fallback is clay's value in case it's ever renamed.
+
+   Asides paint the same transcript amber (see asides.css). Clay and amber sit
+   near each other on the wheel, so a passage carrying both is told apart more
+   by its margin marker than by the tint — an accepted trade for matching the
+   brand.
+
+   ::highlight() honours only a small property set — colour, background,
+   text-decoration, text-shadow — which is why the marker in the margin, not a
+   border here, is what makes a bookmark feel like an object you can click. */
+::highlight(cpp-bookmark) {
+  background-color: hsl(var(--accent-brand, 15 63.1% 59.6%) / 22%);
+}
+
+/* Marker layer. Pointer-transparent so it never intercepts clicks meant for the
+   transcript underneath; the markers themselves take pointer events back. */
+/* Below every layer asides owns — popover 2147483000, gutter 2147482900, cards
+   2147482800. Markers sit in the left margin and asides' chrome in the right,
+   so they don't overlap today; ordering them anyway means a future layout that
+   does bring them together resolves in favour of the thing being read. */
+.cpp-bm-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482700;
+  pointer-events: none;
+}
+
+.cpp-bm-layer[hidden] {
+  display: none;
+}
+
+/* One marker per bookmark, pinned beside the first line of its text. Sized in
+   JS (MARK) as well as here — the two must agree, since the vertical centring
+   maths uses it.
+
+   Clay, claude.ai's brand colour (--accent-brand, what the Send button fills
+   with), so the marker matches its highlight and reads as a claude action. The
+   token is HSL components at this scope, safe inside hsl(), and flips with the
+   theme on its own — no dark-mode override needed. */
+.cpp-bm-mark {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: hsl(var(--accent-brand, 15 63.1% 59.6%));
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0.85;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.cpp-bm-mark .cpp-icon {
+  font-size: 16px;
+}
+
+.cpp-bm-mark[hidden] {
+  display: none;
+}
+
+/* Hover states double as the affordance for "click to remove" — the title says
+   so, but coming to full strength over a faint clay tray is what makes it feel
+   clickable at 20px. */
+.cpp-bm-mark:hover {
+  opacity: 1;
+  background: hsl(var(--accent-brand, 15 63.1% 59.6%) / 0.14);
+}
+
+.cpp-bm-mark:active {
+  background: hsl(var(--accent-brand, 15 63.1% 59.6%) / 0.24);
+}
+
+/* Separator between our Bookmark button and claude.ai's Reply, used only when
+   the asides feature is off — with it on, Bookmark sits behind Ask and Ask's
+   own rule already divides the row. Tinted from currentColor so it tracks their
+   tooltip if it ever stops being dark-on-translucent. */
+.cpp-bm-rule {
+  width: 1px;
+  align-self: stretch;
+  margin: 6px 0;
+  background: currentColor;
+  opacity: 0.18;
+  flex: 0 0 auto;
+}

@@ -49,6 +49,13 @@
       defaultEnabled: true
     },
     {
+      id: "bookmarks",
+      name: "Bookmarks",
+      description:
+        "Select any passage in a chat and choose Bookmark to flag it, the way margin bookmarks work in an editor. The text stays highlighted and a bookmark appears in the left margin beside it; click that to clear it. Bookmarking the same passage again also clears it. Saved per chat, kept across reloads, stored only on this device.",
+      defaultEnabled: true
+    },
+    {
       id: "scroll-nav",
       name: "Scroll navigation buttons",
       description:

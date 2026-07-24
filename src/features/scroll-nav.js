@@ -39,15 +39,21 @@
   var TOP_OFFSET = 12; // px of breathing room above a message we land on
   var Z = 2147482990; // just under the asides popover layer
 
+  // Icons are Anthropicons glyphs (see CPP.util.ICON). The far-jump pair reads
+  // as an arrow travelling into a bar, the step pair as a bare chevron — the
+  // bar is what distinguishes "go to the end" from "go one more". The font
+  // only ships that arrow-into-bar horizontally, so both are rotated upright:
+  // "|←" turned 90° clockwise points up into its bar, "→|" points down into
+  // its bar.
   var BTNS = [
     { key: "top", label: "Jump to start of chat", act: goTop,
-      svg: '<path d="M5 5h14"/><path d="M6 15l6-6 6 6"/>' },
+      cp: "ARROW_BAR_LEFT", rotate: 90 },
     { key: "prev", label: "Previous message you wrote (Alt+↑)", act: goPrevUser,
-      svg: '<path d="M6 15l6-6 6 6"/>' },
+      cp: "CHEVRON_UP" },
     { key: "next", label: "Next message you wrote (Alt+↓)", act: goNextUser,
-      svg: '<path d="M6 9l6 6 6-6"/>' },
+      cp: "CHEVRON_DOWN" },
     { key: "bottom", label: "Jump to most recent", act: goBottom,
-      svg: '<path d="M6 9l6 6 6-6"/><path d="M5 19h14"/>' }
+      cp: "ARROW_BAR_RIGHT", rotate: 90 }
   ];
 
   var bar = null; // toolbar element
@@ -210,14 +216,6 @@
 
   // ---------- toolbar ----------
 
-  function svgIcon(paths) {
-    return (
-      '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" ' +
-      'stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
-      'stroke-linejoin="round" aria-hidden="true">' + paths + "</svg>"
-    );
-  }
-
   function buildBar() {
     if (bar) return;
     bar = document.createElement("div");
@@ -229,7 +227,7 @@
       el.className = "cpp-scrollnav-btn cpp-scrollnav-" + b.key;
       el.title = b.label;
       el.setAttribute("aria-label", b.label);
-      el.innerHTML = svgIcon(b.svg);
+      el.appendChild(CPP.util.icon(CPP.util.ICON[b.cp], b.rotate));
       el.addEventListener("click", function (e) {
         e.preventDefault();
         b.act();

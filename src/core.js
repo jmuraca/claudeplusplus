@@ -82,6 +82,43 @@
           resolve();
         }
       });
+    },
+
+    // ---- Anthropicons -----------------------------------------------------
+    // claude.ai ships its own icon font and declares it document-wide as
+    //   @font-face { font-family: Anthropicons-Variable; ... }
+    // with no unicode-range, so anything we add to the page can render its
+    // glyphs. Drawing our chrome with the real artwork keeps it identical to
+    // claude's own icons at every size, weight and optical size — which
+    // hand-drawn SVG lookalikes never quite manage.
+    //
+    // Two things to know before adding to this map. The glyphs sit at
+    // private-use codepoints, and the font carries no semantic glyph names —
+    // every one is just "uniXXXX" — so these comments are the only record of
+    // what each codepoint draws. And the set is not exhaustive: it has no
+    // vertical "arrow to bar", which is why the two jump-to-end icons take a
+    // horizontal glyph and rotate it upright.
+    ICON: {
+      ASK: 0xe037, // speech bubble, outline (same glyph as the sidebar chat icon)
+      BOOKMARK: 0xe117, // bookmark ribbon, outline
+      DOWNLOAD: 0xe063, // arrow pointing down into a tray
+      CHEVRON_UP: 0xe02b,
+      CHEVRON_DOWN: 0xe027,
+      ARROW_BAR_LEFT: 0xe0de, // "|←" — rotate 90 for an arrow up into a bar
+      ARROW_BAR_RIGHT: 0xe0df // "→|" — rotate 90 for an arrow down into a bar
+    },
+
+    /**
+     * A span carrying one Anthropicons glyph, ready to drop into a button.
+     * `rotate` is degrees clockwise.
+     */
+    icon: function (codepoint, rotate) {
+      var el = document.createElement("span");
+      el.className = "cpp-icon";
+      el.setAttribute("aria-hidden", "true");
+      el.textContent = String.fromCodePoint(codepoint);
+      if (rotate) el.style.transform = "rotate(" + rotate + "deg)";
+      return el;
     }
   };
 

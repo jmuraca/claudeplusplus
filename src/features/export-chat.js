@@ -476,14 +476,6 @@
       .then(function () { setBusy(btn, false); });
   }
 
-  function downloadIcon() {
-    return (
-      '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" ' +
-      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M12 3v12"/><path d="M7 11l5 4 5-4"/><path d="M5 20h14"/></svg>'
-    );
-  }
-
   function mountButton() {
     if (!convoId()) { removeButton(); return; } // only inside a saved chat
     if (document.getElementById(BTN_ID)) return;
@@ -500,8 +492,13 @@
     }
     btn.setAttribute("aria-label", "Download this chat as XML");
     btn.title = "Download this chat as XML";
-    btn.innerHTML =
-      downloadIcon() + '<span class="cpp-export-label">Download</span>';
+    // The glyph is Anthropicons', same as the Share button's own icon, so the
+    // two sit level in the header without any size-matching by hand.
+    btn.appendChild(ctx.util.icon(ctx.util.ICON.DOWNLOAD));
+    var label = document.createElement("span");
+    label.className = "cpp-export-label";
+    label.textContent = "Download";
+    btn.appendChild(label);
     btn.addEventListener("click", onClick);
 
     // Sit just to the left of Share.

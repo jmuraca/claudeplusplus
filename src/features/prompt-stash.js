@@ -244,7 +244,6 @@
     panel = document.createElement("div");
     panel.className = "cps-panel";
     panel.hidden = true;
-    panel.title = "Click (or press " + CHORD + ") to put this back in the message box";
 
     var head = document.createElement("div");
     head.className = "cps-head";
@@ -304,31 +303,13 @@
 
   // Anchored to the live rect of the composer: to its right when the margin can
   // hold the card, otherwise stacked above it and right-aligned. In the side
-  // position the card's top lines up with the composer's top, so the two read as
-  // one row — meaning it rides upward with the composer as a multi-line draft
-  // grows it. The fallback position is bottom-anchored instead, since there the
-  // card sits on top of the composer rather than beside it.
-  // A modal (delete confirmation, settings, share…) drops a full-screen backdrop
-  // over the page. The card lives above claude's UI by design, so it would punch
-  // through that backdrop unless we stand it down while a dialog is open.
-  function modalOpen() {
-    var dialogs = document.querySelectorAll(
-      '[role="dialog"], [role="alertdialog"], [aria-modal="true"]'
-    );
-    for (var i = 0; i < dialogs.length; i++) {
-      var d = dialogs[i];
-      if (d.getAttribute("data-state") === "closed") continue;
-      if (d.getClientRects().length) return true; // mounted and visible
-    }
-    return false;
-  }
-
+  // position the card's top lines up with the composer's top, so it reads as
+  // attached to it, riding upward with the composer as a multi-line draft grows.
+  // The fallback position is bottom-anchored instead, since there the card sits
+  // on top of the composer rather than beside it. (Hiding the card while a modal
+  // is open is done in CSS, not here — see prompt-stash.css.)
   function place() {
     if (!panel || !stash) return;
-    if (modalOpen()) {
-      panel.hidden = true;
-      return;
-    }
     var box = inputBox();
     if (!box) {
       panel.hidden = true;
@@ -376,10 +357,6 @@
     swap();
   }
 
-  function onResize() {
-    place();
-  }
-
   // Keep the card glued to the composer when the composer moves for reasons core's
   // MutationObserver doesn't see — dragging the sidebar wider resizes it without
   // adding or removing a node.
@@ -417,7 +394,7 @@
       if (started) return;
       started = true;
       window.addEventListener("keydown", onKeydownCapture, true);
-      window.addEventListener("resize", onResize);
+      window.addEventListener("resize", place);
       try {
         chrome.storage.onChanged.addListener(onStorageChanged);
       } catch (e) {
@@ -455,7 +432,7 @@
       convId = null;
       stash = "";
       window.removeEventListener("keydown", onKeydownCapture, true);
-      window.removeEventListener("resize", onResize);
+      window.removeEventListener("resize", place);
       try {
         chrome.storage.onChanged.removeListener(onStorageChanged);
       } catch (e) {}

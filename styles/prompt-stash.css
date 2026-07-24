@@ -26,6 +26,15 @@
   display: none;
 }
 
+/* A modal (delete confirmation, settings…) drops a full-screen backdrop over the
+   page — claude draws it as an ::after on the dialog itself, at z-index:auto — so
+   the card, pinned far above claude's UI, would show straight through it. Hide it
+   the instant a dialog is in the DOM: :has() re-evaluates synchronously, whereas
+   toggling it from JS lags a frame behind the backdrop and flashes the card. */
+body:has([role="alertdialog"], [aria-modal="true"]) .cps-panel {
+  display: none;
+}
+
 .cps-head {
   display: flex;
   align-items: center;
@@ -79,9 +88,10 @@
   color: hsl(var(--text-100, 0 0% 12%));
 }
 
-/* The card sizes to its content; a long draft is clamped to a few lines and cut
-   off with an ellipsis, so it never grows unbounded. Nothing is lost: one click
-   puts the whole prompt back in the box. */
+/* The card sizes to its content; a long draft is clamped and cut off with an
+   ellipsis so it never grows unbounded up the page. Nothing is lost: one click
+   puts the whole prompt back in the box. Eight lines is enough to recognise a
+   held draft at a glance without the card dominating the margin. */
 .cps-body {
   min-height: 0;
   font-size: 13px;

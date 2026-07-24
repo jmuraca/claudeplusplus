@@ -30,6 +30,27 @@
       return all ? all[all.length - 1].toLowerCase() : null;
     },
 
+    // The chat id in the current URL, or null when not on a /chat/<uuid> page.
+    currentChatId: function () {
+      var m = util.CHAT_RE.exec(location.pathname);
+      return m ? m[1].toLowerCase() : null;
+    },
+
+    // claude.ai's active org id, from the lastActiveOrg cookie. Needed for the
+    // /api/organizations/<org>/... endpoints; null if the cookie is absent.
+    getOrgId: function () {
+      var m = /(?:^|;\s*)lastActiveOrg=([0-9a-f-]{8,})/i.exec(document.cookie);
+      return m ? m[1] : null;
+    },
+
+    // Normalize claude's several conversation-list response shapes to an array.
+    extractConversations: function (data) {
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.conversations)) return data.conversations;
+      if (data && Array.isArray(data.data)) return data.data;
+      return [];
+    },
+
     // True while our extension context is alive. After the unpacked extension
     // is reloaded/updated, an already-injected content script keeps running but
     // every chrome.* call throws "Extension context invalidated"; chrome.runtime

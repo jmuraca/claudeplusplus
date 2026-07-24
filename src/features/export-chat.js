@@ -42,11 +42,6 @@
     return m ? m[1].toLowerCase() : null;
   }
 
-  function getOrgId() {
-    var m = /(?:^|;\s*)lastActiveOrg=([0-9a-f-]{8,})/i.exec(document.cookie);
-    return m ? m[1] : null;
-  }
-
   // ---------- locate the header Share button ----------
 
   function labelOf(el) {
@@ -455,7 +450,7 @@
     var btn = e.currentTarget;
     if (btn.disabled) return;
 
-    var org = getOrgId();
+    var org = ctx.util.getOrgId();
     var conv = convoId();
     if (!org || !conv) {
       alert("Claude++: couldn't identify this conversation to export.");

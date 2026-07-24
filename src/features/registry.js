@@ -56,6 +56,13 @@
       defaultEnabled: true
     },
     {
+      id: "bookmarks-page",
+      name: "Bookmarks page",
+      description:
+        "Adds a Bookmarks entry to the left sidebar (under Customize) that opens a full page listing every bookmark across all your chats. Search or filter by chat, click a bookmark to jump to that chat and scroll to the passage, and use a row's ⋮ menu to delete it. Reads the same on-device storage as the Bookmarks feature.",
+      defaultEnabled: true
+    },
+    {
       id: "scroll-nav",
       name: "Scroll navigation buttons",
       description:

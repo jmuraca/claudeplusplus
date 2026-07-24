@@ -89,11 +89,6 @@
     return m ? m[1].toLowerCase() : null;
   }
 
-  function getOrgId() {
-    var m = /(?:^|;\s*)lastActiveOrg=([0-9a-f-]{8,})/i.exec(document.cookie);
-    return m ? m[1] : null;
-  }
-
   // ---------- paint ----------
 
   var normal = HAS_HIGHLIGHT ? new Highlight() : null;
@@ -438,7 +433,7 @@
    * is disposable and its ID is never stored.
    */
   function createTempConv() {
-    var org = getOrgId();
+    var org = ctx.util.getOrgId();
     if (!org) return Promise.reject(new Error("Not logged in (no org cookie)"));
 
     return fetch("/api/organizations/" + org + "/chat_conversations", {
@@ -524,7 +519,7 @@
   // streaming completion endpoint.
   // ===========================================================================
   async function askProvider(opts) {
-    var org = getOrgId();
+    var org = ctx.util.getOrgId();
     if (!org) throw new Error("Not logged in — cannot ask Claude");
 
     var asideConvId = await createTempConv();

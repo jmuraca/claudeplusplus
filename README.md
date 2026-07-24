@@ -86,6 +86,20 @@ Margin bookmarks for a conversation, the way an editor does them. Select a passa
   window simply hides until you scroll back, since the text it marks is off screen anyway.
 - Purely local — no network calls, nothing sent anywhere.
 
+### 🔖 Bookmarks page
+The bookmarks above only show while you're in the chat that owns them. This adds one place to
+see them all, modeled on claude's own **Chats** page.
+
+- A **Bookmarks** entry appears in the left sidebar, under **Customize**. Clicking it opens a
+  full-page list (`/bookmarks`) of every bookmark across all your chats, each showing its
+  passage and the chat it belongs to.
+- A **search** box filters by passage text or chat name, and a **chat** dropdown narrows the
+  list to a single conversation.
+- Click a bookmark to open its chat and scroll straight to the passage. Each row's **⋮** menu
+  deletes that bookmark.
+- Chat names are read from claude's own conversations list; everything else comes from the
+  same on-device storage the Bookmarks feature writes, so there's nothing new to sync.
+
 ### ⏸️ Draft mode
 Modeled on Claude Code's Shift+Tab mode switch. Press **Shift+Tab** in the message box
 to arm **Draft mode**, where you can compose freely — type, paste, attach files, dictate,
@@ -252,6 +266,8 @@ Use `CPP.util.icon(codepoint, rotate)` to build one; `styles/content.css` carrie
 | `convProject`              | `{ [conversationUuid]: projectUuid }` | learned chat→project mapping     |
 | `cppAsides:<conversationUuid>` | `[{ id, anchor, question, answer }]` | inline asides for one chat (one key per chat) |
 | `cppBookmarks:<conversationUuid>` | `[{ id, anchor }]`                 | bookmarks for one chat (one key per chat) |
+| `cppChatNames`             | `{ [conversationUuid]: name }`        | cached chat titles for the bookmarks page |
+| `cppBookmarkGoto`          | `{ id, anchor }`                      | transient: scroll target handed to the chat page after clicking a bookmark |
 | `cppPromptStash:<conversationUuid>` | `string`                     | the stashed prompt for one chat (one key per chat) |
 | `cppFeatures`              | `{ [featureId]: boolean }`            | per-feature enable/disable       |
 
@@ -340,9 +356,13 @@ Two limits worth knowing:
    });
    ```
 
-   `ctx.util` provides `currentProjectId()`, `convFromHref(href)`, the UUID regexes,
-   promise-based `get(keys)` / `set(obj)` / `remove(keys)` storage helpers, and
-   `icon(codepoint, rotate)` plus the `ICON` codepoint map for Anthropicons glyphs.
+   `ctx.util` (also reachable as the global `CPP.util`) provides
+   `currentProjectId()`, `currentChatId()`, `convFromHref(href)`, the UUID regexes,
+   `getOrgId()` (claude's active-org cookie, for the `/api/organizations/<org>/…`
+   endpoints) and `extractConversations(data)` (normalizes claude's conversation-list
+   response shapes), promise-based `get(keys)` / `set(obj)` / `remove(keys)` storage
+   helpers, and `icon(codepoint, rotate)` plus the `ICON` codepoint map for
+   Anthropicons glyphs. Reach for these before re-implementing them in a feature.
    If the feature pins UI to a passage of chat text, use `CPP.anchor` rather than
    rolling your own — see [Anchoring](#anchoring-text-to-a-virtualized-transcript).
 

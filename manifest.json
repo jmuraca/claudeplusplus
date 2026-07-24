@@ -5,9 +5,21 @@
   "description": "A set of quality-of-life improvements for the claude.ai interface. Local storage only, no backend.",
   "permissions": ["storage"],
   "host_permissions": ["https://claude.ai/*"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
     "default_popup": "src/popup.html",
-    "default_title": "Claude++ Project Colors"
+    "default_title": "Claude++ Project Colors",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "content_scripts": [
     {

@@ -13,22 +13,13 @@
   var UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
   // ---- storage routing ----------------------------------------------------
-  // Most state stays device-local, but a small allow-list follows the user
-  // across their Chrome profiles via chrome.storage.sync: the feature toggles,
-  // project colors, and per-conversation bookmarks. Everything else (asides,
-  // prompt stash, title caches, device ids) is bulky or device-scoped and stays
-  // on .local to avoid sync's ~100KB / 8KB-per-item / 512-item quotas. The
-  // util.get/set/remove wrappers below route each key to its home area, so
-  // feature code keeps calling ctx.util unchanged.
-  var SYNC_KEYS = { cppFeatures: 1, projectColors: 1 };
-  var SYNC_PREFIXES = ["cppBookmarks:"];
-  function isSyncKey(k) {
-    if (SYNC_KEYS[k]) return true;
-    for (var i = 0; i < SYNC_PREFIXES.length; i++) {
-      if (k.indexOf(SYNC_PREFIXES[i]) === 0) return true;
-    }
-    return false;
-  }
+  // The sync allow-list and the one-time .local→.sync migration live in
+  // storage-sync.js (window.CPP_SYNC), loaded before this script and shared with
+  // the popup so there is one source of truth. The util.get/set/remove wrappers
+  // below route each key to its home area, so feature code keeps calling
+  // ctx.util unchanged.
+  var isSyncKey = window.CPP_SYNC.isSyncKey;
+  var migrateToSync = window.CPP_SYNC.migrateToSync;
   function areaFor(k) {
     return isSyncKey(k) ? chrome.storage.sync : chrome.storage.local;
   }
@@ -62,51 +53,6 @@
         area.remove(keys, function () {
           void (chrome.runtime && chrome.runtime.lastError);
           resolve();
-        });
-      } catch (e) {
-        resolve();
-      }
-    });
-  }
-
-  // One-time move of the synced allow-list from .local (where older versions
-  // kept everything) into chrome.storage.sync. Guarded by a device-local flag
-  // so it runs at most once per profile. If sync.set fails (over quota / sync
-  // disabled) we leave the local copies untouched and skip the flag, so a later
-  // load retries — data is never removed from local until sync has it.
-  function migrateToSync() {
-    return new Promise(function (resolve) {
-      try {
-        chrome.storage.local.get(["cppSyncMigrated"], function (flag) {
-          void (chrome.runtime && chrome.runtime.lastError);
-          if (flag && flag.cppSyncMigrated) return resolve();
-          chrome.storage.local.get(null, function (all) {
-            void (chrome.runtime && chrome.runtime.lastError);
-            all = all || {};
-            var move = {};
-            var keys = [];
-            Object.keys(all).forEach(function (k) {
-              if (k === "cppSyncMigrated") return;
-              if (isSyncKey(k)) {
-                move[k] = all[k];
-                keys.push(k);
-              }
-            });
-            var markDone = function () {
-              chrome.storage.local.set({ cppSyncMigrated: true }, function () {
-                void (chrome.runtime && chrome.runtime.lastError);
-                resolve();
-              });
-            };
-            if (!keys.length) return markDone();
-            chrome.storage.sync.set(move, function () {
-              if (chrome.runtime && chrome.runtime.lastError) return resolve();
-              chrome.storage.local.remove(keys, function () {
-                void (chrome.runtime && chrome.runtime.lastError);
-                markDone();
-              });
-            });
-          });
         });
       } catch (e) {
         resolve();

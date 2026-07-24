@@ -14,41 +14,12 @@ function set(obj) {
   return new Promise(function (r) { chrome.storage.sync.set(obj, r); });
 }
 
-// Mirror of core.js migrateToSync (see the note there): a one-time move of the
-// synced allow-list from .local into .sync, guarded by a device-local flag. The
-// popup runs it too so opening it before ever visiting claude.ai still shows the
-// migrated config rather than defaults. Whichever runs first migrates; the other
-// sees the flag and skips. Kept in step with core.js's SYNC_KEYS/SYNC_PREFIXES.
-function migrateToSync() {
-  function isSyncKey(k) {
-    return k === "cppFeatures" || k === "projectColors" ||
-      k.indexOf("cppBookmarks:") === 0;
-  }
-  return new Promise(function (resolve) {
-    chrome.storage.local.get(["cppSyncMigrated"], function (flag) {
-      if (flag && flag.cppSyncMigrated) return resolve();
-      chrome.storage.local.get(null, function (all) {
-        all = all || {};
-        var move = {};
-        var keys = [];
-        Object.keys(all).forEach(function (k) {
-          if (k !== "cppSyncMigrated" && isSyncKey(k)) {
-            move[k] = all[k];
-            keys.push(k);
-          }
-        });
-        var markDone = function () {
-          chrome.storage.local.set({ cppSyncMigrated: true }, function () { resolve(); });
-        };
-        if (!keys.length) return markDone();
-        chrome.storage.sync.set(move, function () {
-          if (chrome.runtime && chrome.runtime.lastError) return resolve();
-          chrome.storage.local.remove(keys, function () { markDone(); });
-        });
-      });
-    });
-  });
-}
+// The one-time .local→.sync migration is shared with core.js via CPP_SYNC
+// (storage-sync.js, loaded before this script). The popup runs it too so opening
+// it before ever visiting claude.ai still shows migrated config rather than
+// defaults; whichever context runs first migrates, the other sees the flag and
+// skips.
+var migrateToSync = window.CPP_SYNC.migrateToSync;
 
 function isEnabled(flags, f) {
   return Object.prototype.hasOwnProperty.call(flags, f.id)

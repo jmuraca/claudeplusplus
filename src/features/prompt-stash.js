@@ -251,7 +251,14 @@
 
     var title = document.createElement("span");
     title.className = "cps-title";
-    title.textContent = "Stashed";
+    var titleLabel = document.createElement("span");
+    titleLabel.className = "cps-title-label";
+    titleLabel.textContent = "Stashed";
+    var titleHint = document.createElement("span");
+    titleHint.className = "cps-title-hint";
+    titleHint.textContent = " (" + CHORD + " to restore)";
+    title.appendChild(titleLabel);
+    title.appendChild(titleHint);
 
     var x = document.createElement("button");
     x.type = "button";
@@ -270,13 +277,8 @@
     bodyEl = document.createElement("div");
     bodyEl.className = "cps-body";
 
-    var hint = document.createElement("div");
-    hint.className = "cps-hint";
-    hint.textContent = CHORD + " to restore";
-
     panel.appendChild(head);
     panel.appendChild(bodyEl);
-    panel.appendChild(hint);
     panel.addEventListener("click", swap);
 
     document.body.appendChild(panel);
@@ -300,29 +302,33 @@
     place();
   }
 
-  // Wear the composer's own edge: same border width, style and colour, same
-  // corner radius. Read from the live computed style rather than copied into our
-  // stylesheet as literals, so light/dark, a token retune, or a restyled composer
-  // all follow with nothing to keep in sync. If claude ever draws that edge some
-  // other way (a ring shadow, say, with no real border), the inline values are
-  // cleared and prompt-stash.css's own border stands in.
-  function matchEdge(box) {
-    var cs = getComputedStyle(box);
-    var hasBorder = cs.borderTopStyle !== "none" && (parseFloat(cs.borderTopWidth) || 0) > 0;
-    panel.style.borderWidth = hasBorder ? cs.borderTopWidth : "";
-    panel.style.borderStyle = hasBorder ? cs.borderTopStyle : "";
-    panel.style.borderColor = hasBorder ? cs.borderTopColor : "";
-    panel.style.borderRadius = parseFloat(cs.borderTopLeftRadius) ? cs.borderTopLeftRadius : "";
-  }
-
   // Anchored to the live rect of the composer: to its right when the margin can
   // hold the card, otherwise stacked above it and right-aligned. In the side
   // position the card's top lines up with the composer's top, so the two read as
   // one row — meaning it rides upward with the composer as a multi-line draft
   // grows it. The fallback position is bottom-anchored instead, since there the
   // card sits on top of the composer rather than beside it.
+  // A modal (delete confirmation, settings, share…) drops a full-screen backdrop
+  // over the page. The card lives above claude's UI by design, so it would punch
+  // through that backdrop unless we stand it down while a dialog is open.
+  function modalOpen() {
+    var dialogs = document.querySelectorAll(
+      '[role="dialog"], [role="alertdialog"], [aria-modal="true"]'
+    );
+    for (var i = 0; i < dialogs.length; i++) {
+      var d = dialogs[i];
+      if (d.getAttribute("data-state") === "closed") continue;
+      if (d.getClientRects().length) return true; // mounted and visible
+    }
+    return false;
+  }
+
   function place() {
     if (!panel || !stash) return;
+    if (modalOpen()) {
+      panel.hidden = true;
+      return;
+    }
     var box = inputBox();
     if (!box) {
       panel.hidden = true;
@@ -334,13 +340,11 @@
       return;
     }
 
-    matchEdge(box);
-
     var fits = r.right + GAP + CARD_W + EDGE <= window.innerWidth;
     panel.classList.toggle("cps-above", !fits);
-    // Beside the composer the card is the same height, so the two read as one
-    // row; stacked above it, it sizes to its content instead.
-    panel.style.height = fits ? Math.round(r.height) + "px" : "";
+    // The card sizes to its own content; a long draft is clamped with an
+    // ellipsis in CSS so it never grows unbounded up the page.
+    panel.style.height = "";
     // Only one of top/bottom is ever set; the other is cleared so a switch
     // between the two positions can't leave the card stretched between them.
     if (fits) {

@@ -40,9 +40,10 @@
         "src/features/asides.js",
         "src/features/scroll-nav.js",
         "src/features/draft-mode.js",
-        "src/features/export-chat.js"
+        "src/features/export-chat.js",
+        "src/features/prompt-stash.js"
       ],
-      "css": ["styles/content.css", "styles/asides.css", "styles/draft-mode.css", "styles/scroll-nav.css", "styles/export-chat.css"],
+      "css": ["styles/content.css", "styles/asides.css", "styles/draft-mode.css", "styles/scroll-nav.css", "styles/export-chat.css", "styles/prompt-stash.css"],
       "run_at": "document_start",
       "world": "ISOLATED"
     }

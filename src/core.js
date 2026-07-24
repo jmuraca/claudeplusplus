@@ -51,6 +51,47 @@
       return [];
     },
 
+    // ---- composer ---------------------------------------------------------
+    // The message box is claude.ai's ProseMirror editor. Draft-mode, prompt-stash
+    // and emoji-autocomplete all key off it, so the selectors and the "is this the
+    // composer" test live here once rather than copied into each. COMPOSER_SEL
+    // matches the composer wrapper or the editable — whichever an event's target
+    // resolves to.
+    COMPOSER_SEL: '[data-chat-input-container], [data-testid="chat-input"]',
+
+    // True when `node` (or the element it sits in) is inside something matching
+    // `sel`. Tolerates a text node or null, which a bare Element.closest won't.
+    closest: function (node, sel) {
+      var el = node && node.nodeType === 1 ? node : node && node.parentElement;
+      return !!(el && el.closest && el.closest(sel));
+    },
+
+    // The composer's contenteditable, or null when it isn't mounted. Candidates
+    // are tried most-specific first.
+    composerEditor: function () {
+      var sels = [
+        '[data-chat-input-container] [contenteditable="true"]',
+        '[data-testid="chat-input"] [contenteditable="true"]',
+        '[contenteditable="true"][data-testid="chat-input"]',
+        'div.ProseMirror[contenteditable="true"]'
+      ];
+      for (var i = 0; i < sels.length; i++) {
+        var el = document.querySelector(sels[i]);
+        if (el) return el;
+      }
+      return null;
+    },
+
+    // True while the composer has focus or an event came from it. Both the passed
+    // node and the active element are checked, since which one is the reliable
+    // signal depends on where the key/input event was dispatched.
+    inComposer: function (node) {
+      return (
+        util.closest(node, util.COMPOSER_SEL) ||
+        util.closest(document.activeElement, util.COMPOSER_SEL)
+      );
+    },
+
     // True while our extension context is alive. After the unpacked extension
     // is reloaded/updated, an already-injected content script keeps running but
     // every chrome.* call throws "Extension context invalidated"; chrome.runtime

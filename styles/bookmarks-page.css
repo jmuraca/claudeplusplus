@@ -37,7 +37,8 @@
   background: inherit;
 }
 
-.cpp-bmpage-filtericon .cpp-icon {
+.cpp-bmpage-filtericon .cpp-icon,
+.cpp-bmpage-groupicon .cpp-icon {
   font-size: 16px;
 }
 
@@ -51,6 +52,17 @@
   flex-direction: column;
   gap: 2px;
   padding-top: 4px;
+}
+
+/* Group headers */
+.cpp-bmpage-group-header {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: hsl(var(--text-300));
+  padding: 14px 12px 4px;
+  user-select: none;
 }
 
 .cpp-bmpage-row {

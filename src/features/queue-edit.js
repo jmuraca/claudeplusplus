@@ -39,6 +39,11 @@
   // so the two land as the separate paragraphs they were written as.
   var JOIN = "\n\n";
 
+  // Prefixes the accessible name, which then carries the message text itself —
+  // parallel to claude's own "Discard queued message" on the × beside it, and
+  // enough on its own to tell the two buttons in a row apart.
+  var LABEL = "Edit queued message: ";
+
   var started = false;
 
   // ---------- the queue ----------
@@ -73,11 +78,30 @@
     return null;
   }
 
-  // ---------- the click ----------
+  // ---------- pulling one back ----------
+
+  // Move a queued message into the composer and out of the queue. Returns false
+  // without touching anything when it can't be done in full — nothing to move,
+  // nowhere to put it, or no way to take it out of the queue — so the caller can
+  // leave the event alone rather than half-doing the job.
+  function pullBack(bubble) {
+    var text = queuedText(bubble);
+    var ed = CPP.util.composerEditor();
+    var discard = discardButton(bubble);
+    if (!text || !ed || !discard) return false;
+
+    var current = CPP.util.composerText(ed);
+    CPP.util.setComposerText(current ? current + JOIN + text : text, ed);
+    // Composer first, queue second. If the discard doesn't take, the user has the
+    // text in two places, which is a nuisance they can see and fix; the other
+    // order risks dropping the message on the floor. setComposerText has already
+    // put focus in the box, so removing the row can't strand it.
+    discard.click();
+    return true;
+  }
 
   function onClickCapture(e) {
-    // Middle/right clicks open menus and paste; only a plain left click edits.
-    if (e.button) return;
+    // Modified clicks are the browser's (context menu, open-in-tab habits).
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
 
     var bubble = queuedBubble(e.target);
@@ -88,47 +112,69 @@
     var sel = window.getSelection();
     if (sel && !sel.isCollapsed && sel.anchorNode && bubble.contains(sel.anchorNode)) return;
 
-    var text = queuedText(bubble);
-    var ed = CPP.util.composerEditor();
-    var discard = discardButton(bubble);
-    // Nothing to move, nowhere to put it, or no way to take it out of the queue:
-    // leave the click alone rather than half-doing the job.
-    if (!text || !ed || !discard) return;
-
+    if (!pullBack(bubble)) return;
     e.preventDefault();
     e.stopImmediatePropagation();
+  }
 
-    var current = CPP.util.composerText(ed);
-    CPP.util.setComposerText(current ? current + JOIN + text : text, ed);
-    // Composer first, queue second. If the discard doesn't take, the user has the
-    // text in two places, which is a nuisance they can see and fix; the other
-    // order risks dropping the message on the floor.
-    discard.click();
+  // The keyboard half of the same affordance: decorate() makes each queued
+  // bubble a focusable button, and a button is expected to answer to Enter and
+  // Space. Without this the feature would be reachable by mouse only, while the
+  // Discard beside it has always been on the tab ring.
+  function onKeydownCapture(e) {
+    if (e.isComposing) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (e.key !== "Enter" && e.key !== " " && e.key !== "Spacebar") return;
+
+    var bubble = queuedBubble(e.target);
+    if (!bubble) return;
+    if (!pullBack(bubble)) return;
+    // Space would otherwise scroll the transcript out from under the composer
+    // we've just filled.
+    e.preventDefault();
+    e.stopImmediatePropagation();
   }
 
   // ---------- the affordance ----------
 
-  // A queued bubble has never been clickable, so it has to say that it is now —
-  // and say what the click does, since "clickable" alone doesn't distinguish
-  // edit from the discard that's been the only option until now. Marking the
-  // bubble is all this does; the label and the rest of the cue are drawn in CSS
-  // off that one class, which is a pseudo-element rather than a node so there's
-  // nothing of ours inside React's tree for a re-render to fight over.
+  // A queued bubble has never been actionable, so it has to say that it is now —
+  // and say what the action is, since the × beside it has trained the opposite
+  // expectation. Sighted users get that from CSS hanging off the class (the
+  // hover cue and the "Click to edit" label, drawn as a pseudo-element so
+  // there's nothing of ours inside React's tree for a re-render to fight over);
+  // everyone else gets it from the button role, the tab stop, and a label that
+  // names both the action and the message it applies to.
+  //
+  // Guarded on the class, not applied unconditionally: every attribute write is
+  // a mutation, core re-applies on mutations, and the two would chase each other
+  // for as long as a queue existed.
   function decorate() {
     var queue = document.querySelector(QUEUE_SEL);
     if (!queue) return;
     var bubbles = queue.querySelectorAll(BUBBLE_SEL);
     for (var i = 0; i < bubbles.length; i++) {
-      if (!bubbles[i].classList.contains(MARK)) bubbles[i].classList.add(MARK);
+      var b = bubbles[i];
+      if (b.classList.contains(MARK)) continue;
+      b.classList.add(MARK);
+      b.setAttribute("role", "button");
+      b.setAttribute("tabindex", "0");
+      b.setAttribute("aria-label", LABEL + queuedText(b));
     }
   }
 
   // React re-renders replace these nodes freely, so undecorating walks the
   // document rather than the queue: a bubble we marked may already have been
   // detached, and one still on screen may sit outside the container we last saw.
+  // Only what decorate() set is removed — claude puts no role, tabindex or label
+  // on these bubbles of its own, so there's nothing of its to clobber.
   function undecorate() {
     var marked = document.querySelectorAll("." + MARK);
-    for (var i = 0; i < marked.length; i++) marked[i].classList.remove(MARK);
+    for (var i = 0; i < marked.length; i++) {
+      marked[i].classList.remove(MARK);
+      marked[i].removeAttribute("role");
+      marked[i].removeAttribute("tabindex");
+      marked[i].removeAttribute("aria-label");
+    }
   }
 
   // Metadata (name/description/defaultEnabled) lives in features/registry.js.
@@ -138,12 +184,13 @@
     onInit: function () {
       if (started) return;
       started = true;
-      // Capture phase, so the click is ours before any handler claude has on the
+      // Capture phase, so the event is ours before any handler claude has on the
       // bubble runs — the one exception being touch screens, where claude lays a
       // full-bubble Discard button over it that swallows the tap first. That's
       // deliberate: the × is hidden on touch, so intercepting the overlay would
-      // leave no way to discard at all. Editing is a pointer affordance.
+      // leave no way to discard at all. Tapping there discards, as it always has.
       window.addEventListener("click", onClickCapture, true);
+      window.addEventListener("keydown", onKeydownCapture, true);
     },
 
     // Core calls this (debounced) on DOM churn, which is every queue change.
@@ -152,6 +199,7 @@
     onTeardown: function () {
       started = false;
       window.removeEventListener("click", onClickCapture, true);
+      window.removeEventListener("keydown", onKeydownCapture, true);
       undecorate();
     }
   });

@@ -26,9 +26,27 @@
 }
 
 /* The ring is inset rather than a border: the bubble's size is claude's to set,
-   and a real border would shift its text by a pixel on hover. */
-.cpp-qedit:hover {
+   and a real border would shift its text by a pixel on hover. Focus gets the
+   same treatment as hover throughout this file — decorate() makes each queued
+   bubble a real tab stop, and a focused one has to show what a hovered one does
+   or the keyboard path is invisible. */
+.cpp-qedit:hover,
+.cpp-qedit:focus-visible {
   box-shadow: inset 0 0 0 1px hsl(var(--border-300, 0 0% 85%));
+}
+
+/* On top of that ring, the focus indicator proper, in claude's accent — drawn
+   outside the bubble so it reads against the ring rather than merging with it. */
+.cpp-qedit:focus-visible {
+  outline: 2px solid hsl(var(--accent-100, 15 63% 60%));
+  outline-offset: 2px;
+}
+
+/* The bubble is only a tab stop while the feature owns it, so the browser's
+   default outline on a plain click (which fires focus on some platforms) would
+   be noise; :focus-visible above is the one that shows. */
+.cpp-qedit:focus:not(:focus-visible) {
+  outline: none;
 }
 
 /* Queued text is muted to read as "not sent yet". On hover it comes up to body
@@ -38,7 +56,8 @@
   transition: color 120ms ease;
 }
 
-.cpp-qedit:hover [data-testid="user-message"] {
+.cpp-qedit:hover [data-testid="user-message"],
+.cpp-qedit:focus-visible [data-testid="user-message"] {
   color: hsl(var(--text-100, 0 0% 12%));
 }
 
@@ -69,7 +88,8 @@
   transition: opacity 120ms ease;
 }
 
-.cpp-qedit:hover::after {
+.cpp-qedit:hover::after,
+.cpp-qedit:focus-visible::after {
   opacity: 1;
 }
 

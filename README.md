@@ -234,8 +234,12 @@ message clickable.
   queue is React state, so a node pulled out from under it would come back on the next render
   — and still be sent. If the text can't be placed or the message can't be removed, the click
   is left alone entirely, so a queued message is never dropped without landing in the box.
-- Editing is a **pointer** affordance. On a touch screen claude lays its own full-bubble
-  Discard target over the message and hides the ×, so a tap there discards as it always has.
+- Keyboard reachable: each queued message is a tab stop announced as *"Edit queued message:
+  &lt;the text&gt;"*, and **Enter** or **Space** pulls it back — the same treatment claude's own
+  **Discard** already had. Focus shows the same cue hovering does, plus a focus ring.
+- On a **touch screen** claude lays its own full-bubble Discard target over the message and
+  hides the ×, so a tap there discards as it always has — intercepting it would leave no way
+  to discard at all.
 
 More features can be toggled on/off from the popup.
 
@@ -449,6 +453,28 @@ Two limits worth knowing:
 3. Add its `{ id, name, description, defaultEnabled }` to the list in
    `src/features/registry.js` — the single source of truth core.js and the popup
    both read, so the toggle appears automatically.
+
+## Tests
+
+```
+npm install   # once — jsdom, the only dependency, and test-only
+npm test      # node --test
+```
+
+The extension itself has no dependencies and is loaded straight from source; the
+release zip is an explicit allow-list (`manifest.json`, `src`, `styles`, `icons`),
+so `package.json`, `test/` and `node_modules/` never reach a build.
+
+Tests live in `test/*.test.js` and run on Node's built-in runner against a jsdom
+document. They exist for the part of a feature that is genuinely fragile: these
+features reach into **claude.ai's markup**, which is not ours and changes without
+notice. So a test fixture is the real DOM captured from the page, and what's
+asserted is the reaching — which node an event resolves to, which of several
+identically-labelled controls gets pressed, that a lookalike node elsewhere on the
+page is left alone, and that teardown puts everything back. `CPP` is stubbed
+rather than loaded, since `core.js` wants `chrome.*` and the storage layer, and
+neither is what's under test. `.github/workflows/test.yml` runs the suite on every
+push and PR that touches `src/` or `test/`.
 
 ## Releasing
 

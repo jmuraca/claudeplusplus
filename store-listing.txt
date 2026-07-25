@@ -54,7 +54,7 @@ Inspired by Claude Code's Shift+Tab. Press Shift+Tab in the message box to arm D
 Press Ctrl+S (⌘S on macOS) to set a half-written prompt aside: it leaves the composer and waits in a card beside it. Press Ctrl+S on an empty box to bring it back, or stash a second prompt to swap the two. One slot per conversation, kept across reloads.
 
 ✏️ Edit queued messages
-A message queued while Claude is replying can normally only be discarded. Hover one and a "Click to edit" hint appears above it, opposite the × that discards: click the message and its text comes back into the message box — added to the end of whatever you'd already typed — and it leaves the queue, ready to fix up and send again.
+A message queued while Claude is replying can normally only be discarded. Hover one and a "Click to edit" hint appears above it, opposite the × that discards: click the message — or tab to it and press Enter — and its text comes back into the message box — added to the end of whatever you'd already typed — and it leaves the queue, ready to fix up and send again.
 
 Privacy
 Claude++ collects no data and sends nothing to any server of its own — it has none. It requires access to claude.ai only. Your feature toggles, project colors, and bookmarks are saved with chrome.storage.sync, so Chrome carries them to your other signed-in browsers; everything else (asides, stashed prompts, caches) stays on the device in chrome.storage.local. When you delete a chat or project, anything Claude++ saved for it is deleted too.

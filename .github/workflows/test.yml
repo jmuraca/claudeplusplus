@@ -1,0 +1,39 @@
+name: Tests
+
+# Runs the DOM tests on every push and pull request that touches the extension
+# source or the tests themselves. Nothing here is part of a build: the release
+# workflow zips an explicit allow-list (manifest.json, src, styles, icons), so
+# package.json and test/ never reach the packaged extension.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/test.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/test.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # node --test with directory discovery; jsdom 27 wants a current Node.
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test

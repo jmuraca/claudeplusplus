@@ -101,7 +101,7 @@
       id: "queue-edit",
       name: "Edit queued messages",
       description:
-        "A message queued while Claude is replying can normally only be discarded. This makes it clickable: click a queued message and its text returns to the message box — added to the end of whatever you've already typed — and it leaves the queue, so you can fix it up and send it again. The × beside it still discards.",
+        "A message queued while Claude is replying can normally only be discarded. This makes it clickable: click a queued message (or focus it and press Enter) and its text returns to the message box — added to the end of whatever you've already typed — and it leaves the queue, so you can fix it up and send it again. The × beside it still discards.",
       defaultEnabled: true
     }
   ];

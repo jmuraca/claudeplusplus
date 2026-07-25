@@ -14,12 +14,10 @@
 // cards. When the margin is too narrow for it, the card sits above the composer
 // instead.
 //
-// Reading the box is easy (innerText); writing it is the delicate part, because
-// the composer is a ProseMirror editor that owns its DOM and will discard nodes
-// we insert. So we never touch its DOM: we select its contents and let the
-// browser's own editing commands do the edit, which ProseMirror observes and
-// folds into its document. A synthetic paste is tried first (it round-trips
-// multi-line text in one step), with execCommand as the fallback.
+// Reading and writing the box both go through CPP.util (composerText /
+// setComposerText), which is where the ProseMirror-safe editing lives — the
+// editor owns its DOM and would discard nodes we inserted, so text is written by
+// selecting and issuing the browser's own editing commands.
 //
 // The stash is per conversation: each /chat/<uuid> has its own slot, stored
 // under its own key the way asides.js stores its cards, so a draft parked in one
@@ -30,8 +28,9 @@
 (function () {
   "use strict";
 
-  // The composer selectors and the "is this the composer" / editable lookups are
-  // shared in CPP.util (core.js), same source as draft-mode and emoji-autocomplete.
+  // The composer selectors, the "is this the composer" / editable lookups and the
+  // read/write helpers are shared in CPP.util (core.js), same source as
+  // draft-mode, emoji-autocomplete and queue-edit.
 
   var STORE_PREFIX = "cppPromptStash:";
 
@@ -118,67 +117,6 @@
     return wrap || ed;
   }
 
-  // innerText, not textContent: it renders the block structure as newlines, so a
-  // multi-paragraph prompt comes back with its line breaks intact. ProseMirror's
-  // trailing break contributes a final newline, hence the trim.
-  function readText(ed) {
-    if (!ed) return "";
-    var t = ed.innerText != null ? ed.innerText : ed.textContent || "";
-    return t.replace(/\u200b/g, "").trim();
-  }
-
-  function selectAll(ed) {
-    var r = document.createRange();
-    r.selectNodeContents(ed);
-    var sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(r);
-  }
-
-  // A synthetic paste is the one edit that carries multi-line text across in a
-  // single step: ProseMirror parses the clipboard payload itself and builds the
-  // paragraphs. It signals it handled the event by calling preventDefault — but
-  // Chrome has historically ignored `clipboardData` passed to the constructor, in
-  // which case it would "handle" an empty clipboard, so the result is verified
-  // rather than trusted.
-  function pasteInto(ed, text) {
-    try {
-      var dt = new DataTransfer();
-      dt.setData("text/plain", text);
-      var ev = new ClipboardEvent("paste", {
-        clipboardData: dt,
-        bubbles: true,
-        cancelable: true
-      });
-      ed.dispatchEvent(ev);
-      return ev.defaultPrevented && readText(ed) !== "";
-    } catch (e) {
-      return false;
-    }
-  }
-
-  // Replace the composer's contents. Everything goes through browser editing
-  // commands on a selection, so ProseMirror sees ordinary user edits and stays in
-  // sync; inserting nodes ourselves would be undone on its next render.
-  function writeText(ed, text) {
-    if (!ed) return;
-    ed.focus();
-    selectAll(ed);
-    document.execCommand("delete");
-    if (!text) return;
-    if (pasteInto(ed, text)) return;
-
-    // Fallback: type it in a line at a time, splitting paragraphs the way Enter
-    // would. Re-select first, since a paste that preventDefault'ed without
-    // inserting may have moved the selection.
-    selectAll(ed);
-    var lines = text.split("\n");
-    for (var i = 0; i < lines.length; i++) {
-      if (i) document.execCommand("insertParagraph");
-      if (lines[i]) document.execCommand("insertText", false, lines[i]);
-    }
-  }
-
   // ---------- the stash ----------
 
   function setStash(text) {
@@ -203,9 +141,9 @@
     if (!convId) return;
     var ed = CPP.util.composerEditor();
     if (!ed) return;
-    var current = readText(ed);
+    var current = CPP.util.composerText(ed);
     if (!current && !stash) return;
-    writeText(ed, stash);
+    CPP.util.setComposerText(stash, ed);
     setStash(current);
     flash();
   }

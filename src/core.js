@@ -60,6 +60,43 @@
     });
   }
 
+  // ---- composer editing ---------------------------------------------------
+  // Helpers behind util.composerText / util.setComposerText. The composer is a
+  // ProseMirror editor that owns its DOM and discards nodes inserted under it,
+  // so text is never written by touching that DOM: its contents are selected and
+  // edited through the browser's own editing commands, which ProseMirror
+  // observes and folds into its document.
+
+  function selectAllIn(ed) {
+    var r = document.createRange();
+    r.selectNodeContents(ed);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+  }
+
+  // A synthetic paste is the one edit that carries multi-line text across in a
+  // single step: ProseMirror parses the clipboard payload itself and builds the
+  // paragraphs. It signals it handled the event by calling preventDefault — but
+  // Chrome has historically ignored `clipboardData` passed to the constructor, in
+  // which case it would "handle" an empty clipboard, so the result is verified
+  // rather than trusted.
+  function pasteInto(ed, text) {
+    try {
+      var dt = new DataTransfer();
+      dt.setData("text/plain", text);
+      var ev = new ClipboardEvent("paste", {
+        clipboardData: dt,
+        bubbles: true,
+        cancelable: true
+      });
+      ed.dispatchEvent(ev);
+      return ev.defaultPrevented && util.composerText(ed) !== "";
+    } catch (e) {
+      return false;
+    }
+  }
+
   var util = {
     UUID_G: new RegExp(UUID, "gi"),
     PROJECT_RE: new RegExp("/project/(" + UUID + ")", "i"),
@@ -145,6 +182,47 @@
         util.closest(node, util.COMPOSER_SEL) ||
         util.closest(document.activeElement, util.COMPOSER_SEL)
       );
+    },
+
+    // An element's text the way a person reads it. innerText, not textContent:
+    // it renders the block structure as newlines, so multi-paragraph content
+    // comes back with its line breaks intact — which matters for anything headed
+    // for the composer. ProseMirror's trailing break contributes a final newline,
+    // hence the trim, and any zero-width spaces in rendered text are dropped so
+    // they never reach a prompt.
+    plainText: function (el) {
+      if (!el) return "";
+      var t = el.innerText != null ? el.innerText : el.textContent || "";
+      return t.replace(/\u200b/g, "").trim();
+    },
+
+    // The message box's contents; "" when it's empty or unmounted. `ed` is
+    // optional — the live editor is looked up when it's omitted.
+    composerText: function (ed) {
+      return util.plainText(ed || util.composerEditor());
+    },
+
+    // Replace the message box's contents, leaving the caret at the end. Goes
+    // through browser editing commands on a selection (see selectAllIn/pasteInto
+    // above) so ProseMirror stays in sync. `ed` is optional.
+    setComposerText: function (text, ed) {
+      var el = ed || util.composerEditor();
+      if (!el) return;
+      el.focus();
+      selectAllIn(el);
+      document.execCommand("delete");
+      if (!text) return;
+      if (pasteInto(el, text)) return;
+
+      // Fallback: type it in a line at a time, splitting paragraphs the way Enter
+      // would. Re-select first, since a paste that preventDefault'ed without
+      // inserting may have moved the selection.
+      selectAllIn(el);
+      var lines = String(text).split("\n");
+      for (var i = 0; i < lines.length; i++) {
+        if (i) document.execCommand("insertParagraph");
+        if (lines[i]) document.execCommand("insertText", false, lines[i]);
+      }
     },
 
     // True while our extension context is alive. After the unpacked extension

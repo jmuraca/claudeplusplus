@@ -10,3 +10,8 @@ claudeplusplus.zip
 # codepoint actually draws (see CPP.util.ICON). We never ship a font — our glyphs
 # render through claude's own document-wide @font-face — so it isn't source.
 anthropicons.woff2
+
+# Test-only dependencies (jsdom). The extension itself ships no dependencies —
+# the release zip is an explicit allow-list of manifest.json, src, styles and
+# icons — so nothing here ever reaches a build.
+node_modules/

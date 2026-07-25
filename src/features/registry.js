@@ -96,6 +96,13 @@
       description:
         "Press Ctrl+S (⌘S on macOS) in the message box to set a prompt aside: it leaves the composer and waits in a card beside it. Press Ctrl+S on an empty box (or click the card) to bring it back. Stash a second prompt while one is held and the two swap, so one key cycles between two drafts. The card's × discards it. One slot per conversation, kept across reloads — a draft stashed in a chat stays with that chat.",
       defaultEnabled: true
+    },
+    {
+      id: "queue-edit",
+      name: "Edit queued messages",
+      description:
+        "A message queued while Claude is replying can normally only be discarded. This makes it clickable: click a queued message (or focus it and press Enter) and its text returns to the message box — added to the end of whatever you've already typed — and it leaves the queue, so you can fix it up and send it again. The × beside it still discards.",
+      defaultEnabled: true
     }
   ];
 })(typeof window !== "undefined" ? window : this);

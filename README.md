@@ -216,6 +216,31 @@ in the right margin; press **Ctrl+S** on an empty box — or click the card — 
   editing commands (a synthetic paste, falling back to `execCommand`), which ProseMirror
   observes and folds into its document.
 
+### ✏️ Edit queued messages
+Messages you queue while Claude is replying are final — the only control on one is
+**Discard**, so a typo means losing the text and typing it again. This makes a queued
+message clickable.
+
+- Click a queued message and its text comes back into the message box, and the message
+  leaves the queue. Fix it up and send it again.
+- If you'd already typed something, the queued text is **appended** to it, separated by a
+  blank line — so clicking two queued messages merges them, in order, as separate paragraphs.
+- Hovering a queued message raises a **Click to edit** label above it, opposite claude's own
+  **×**, so the two actions read as a pair — the × still discards. The bubble also takes a
+  pointer cursor and brings its muted text back up to full strength, the way text goes from
+  dimmed to editable. A queued message you drag-select (to copy a phrase out of it) is left
+  alone.
+- Removal goes through claude's own Discard control rather than by deleting the bubble: the
+  queue is React state, so a node pulled out from under it would come back on the next render
+  — and still be sent. If the text can't be placed or the message can't be removed, the click
+  is left alone entirely, so a queued message is never dropped without landing in the box.
+- Keyboard reachable: each queued message is a tab stop announced as *"Edit queued message:
+  &lt;the text&gt;"*, and **Enter** or **Space** pulls it back — the same treatment claude's own
+  **Discard** already had. Focus shows the same cue hovering does, plus a focus ring.
+- On a **touch screen** claude lays its own full-bubble Discard target over the message and
+  hides the ×, so a tap there discards as it always has — intercepting it would leave no way
+  to discard at all.
+
 More features can be toggled on/off from the popup.
 
 ## Install
@@ -415,7 +440,12 @@ Two limits worth knowing:
    endpoints) and `extractConversations(data)` (normalizes claude's conversation-list
    response shapes), promise-based `get(keys)` / `set(obj)` / `remove(keys)` storage
    helpers, and `icon(codepoint, rotate)` plus the `ICON` codepoint map for
-   Anthropicons glyphs. Reach for these before re-implementing them in a feature.
+   Anthropicons glyphs, and `plainText(el)` for an element's text as a person
+   reads it (block structure as newlines, zero-width spaces dropped). For the
+   message box there's `composerEditor()`, `inComposer(node)`, `composerText([ed])`
+   and `setComposerText(text, [ed])` — the last of which does the write the way
+   ProseMirror will accept, which is not something to re-derive. Reach for these
+   before re-implementing them in a feature.
    If the feature pins UI to a passage of chat text, use `CPP.anchor` rather than
    rolling your own — see [Anchoring](#anchoring-text-to-a-virtualized-transcript).
 
@@ -423,6 +453,28 @@ Two limits worth knowing:
 3. Add its `{ id, name, description, defaultEnabled }` to the list in
    `src/features/registry.js` — the single source of truth core.js and the popup
    both read, so the toggle appears automatically.
+
+## Tests
+
+```
+npm install   # once — jsdom, the only dependency, and test-only
+npm test      # node --test
+```
+
+The extension itself has no dependencies and is loaded straight from source; the
+release zip is an explicit allow-list (`manifest.json`, `src`, `styles`, `icons`),
+so `package.json`, `test/` and `node_modules/` never reach a build.
+
+Tests live in `test/*.test.js` and run on Node's built-in runner against a jsdom
+document. They exist for the part of a feature that is genuinely fragile: these
+features reach into **claude.ai's markup**, which is not ours and changes without
+notice. So a test fixture is the real DOM captured from the page, and what's
+asserted is the reaching — which node an event resolves to, which of several
+identically-labelled controls gets pressed, that a lookalike node elsewhere on the
+page is left alone, and that teardown puts everything back. `CPP` is stubbed
+rather than loaded, since `core.js` wants `chrome.*` and the storage layer, and
+neither is what's under test. `.github/workflows/test.yml` runs the suite on every
+push and PR that touches `src/` or `test/`.
 
 ## Releasing
 

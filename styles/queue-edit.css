@@ -1,0 +1,82 @@
+/* Claude++ — edit a queued message
+ *
+ * A queued bubble has always been inert (its only control is the Discard × that
+ * fades in to its right), so this has to say two things on hover: that the
+ * message can be clicked, and that clicking edits rather than discards — the ×
+ * has trained the opposite expectation. The bubble gets a pointer cursor, a
+ * hairline ring and its muted text back at full strength; a "Click to edit"
+ * label rises above it, opposite the ×, so the two actions read as a pair.
+ *
+ * The label is a pseudo-element, not a node: the bubble belongs to React, and
+ * anything we appended inside it would be a re-render away from being dropped.
+ *
+ * Everything hangs off .cpp-qedit, which queue-edit.js adds and removes with the
+ * feature, so turning the feature off takes the affordance with it and leaves
+ * claude's own styling untouched. Colours come from claude.ai's custom
+ * properties (with fallbacks), so light/dark and any token retune follow. */
+
+[data-testid="pending-queue-row"] [data-user-message-bubble].cpp-qedit {
+  cursor: pointer;
+  /* The bubble already carries claude's own `relative`; restated so the label is
+     positioned against the bubble even if that ever changes. No offsets, so it
+     costs no layout. */
+  position: relative;
+  transition: box-shadow 120ms ease;
+}
+
+/* The ring is inset rather than a border: the bubble's size is claude's to set,
+   and a real border would shift its text by a pixel on hover. */
+[data-testid="pending-queue-row"] [data-user-message-bubble].cpp-qedit:hover {
+  box-shadow: inset 0 0 0 1px hsl(var(--border-300, 0 0% 85%));
+}
+
+/* Queued text is muted to read as "not sent yet". On hover it comes up to body
+   colour — the same move as text going from dimmed back to editable, which is
+   exactly what the click does. Selector is deep enough to beat the utility
+   class claude sets the muted colour with. */
+[data-testid="pending-queue-row"] [data-user-message-bubble].cpp-qedit [data-testid="user-message"] {
+  transition: color 120ms ease;
+}
+
+[data-testid="pending-queue-row"] [data-user-message-bubble].cpp-qedit:hover [data-testid="user-message"] {
+  color: hsl(var(--text-100, 0 0% 12%));
+}
+
+/* The label. Sits above the bubble and flush with its right edge, so it lines up
+   over the message rather than floating in the margin, and reads as a dark pill
+   in the same shape claude gives its own tooltips (always-black/white tokens, so
+   it stays dark in light mode and doesn't invert). pointer-events:none keeps it
+   from swallowing the click it's advertising when the pointer drifts up. */
+[data-testid="pending-queue-row"] [data-user-message-bubble].cpp-qedit::after {
+  content: "Click to edit";
+  position: absolute;
+  bottom: calc(100% + 4px);
+  right: 0;
+  z-index: 5;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: var(--font-ui, system-ui, -apple-system, sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: hsl(var(--always-white, 0 0% 100%));
+  background: hsl(var(--always-black, 0 0% 0%) / 0.8);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px hsl(var(--always-black, 0 0% 0%) / 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+[data-testid="pending-queue-row"] [data-user-message-bubble].cpp-qedit:hover::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-testid="pending-queue-row"] [data-user-message-bubble].cpp-qedit,
+  [data-testid="pending-queue-row"] [data-user-message-bubble].cpp-qedit::after,
+  [data-testid="pending-queue-row"] [data-user-message-bubble].cpp-qedit [data-testid="user-message"] {
+    transition: none;
+  }
+}

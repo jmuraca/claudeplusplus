@@ -53,9 +53,7 @@
   }
 
   function queuedText(bubble) {
-    var el = bubble.querySelector(TEXT_SEL) || bubble;
-    var t = el.innerText != null ? el.innerText : el.textContent || "";
-    return t.replace(/\u200b/g, "").trim();
+    return CPP.util.plainText(bubble.querySelector(TEXT_SEL) || bubble);
   }
 
   // claude's Discard control for this row. Searched from the bubble outwards and

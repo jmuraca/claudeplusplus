@@ -184,16 +184,22 @@
       );
     },
 
-    // The message box's contents as plain text; "" when it's empty or unmounted.
-    // innerText, not textContent: it renders the block structure as newlines, so
-    // a multi-paragraph draft comes back with its line breaks intact.
-    // ProseMirror's trailing break contributes a final newline, hence the trim.
-    // `ed` is optional — the live editor is looked up when it's omitted.
-    composerText: function (ed) {
-      var el = ed || util.composerEditor();
+    // An element's text the way a person reads it. innerText, not textContent:
+    // it renders the block structure as newlines, so multi-paragraph content
+    // comes back with its line breaks intact — which matters for anything headed
+    // for the composer. ProseMirror's trailing break contributes a final newline,
+    // hence the trim, and any zero-width spaces in rendered text are dropped so
+    // they never reach a prompt.
+    plainText: function (el) {
       if (!el) return "";
       var t = el.innerText != null ? el.innerText : el.textContent || "";
       return t.replace(/\u200b/g, "").trim();
+    },
+
+    // The message box's contents; "" when it's empty or unmounted. `ed` is
+    // optional — the live editor is looked up when it's omitted.
+    composerText: function (ed) {
+      return util.plainText(ed || util.composerEditor());
     },
 
     // Replace the message box's contents, leaving the caret at the end. Goes

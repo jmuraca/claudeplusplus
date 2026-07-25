@@ -436,10 +436,12 @@ Two limits worth knowing:
    endpoints) and `extractConversations(data)` (normalizes claude's conversation-list
    response shapes), promise-based `get(keys)` / `set(obj)` / `remove(keys)` storage
    helpers, and `icon(codepoint, rotate)` plus the `ICON` codepoint map for
-   Anthropicons glyphs. For the message box there's `composerEditor()`,
-   `inComposer(node)`, `composerText([ed])` and `setComposerText(text, [ed])` —
-   the last of which does the write the way ProseMirror will accept, which is not
-   something to re-derive. Reach for these before re-implementing them in a feature.
+   Anthropicons glyphs, and `plainText(el)` for an element's text as a person
+   reads it (block structure as newlines, zero-width spaces dropped). For the
+   message box there's `composerEditor()`, `inComposer(node)`, `composerText([ed])`
+   and `setComposerText(text, [ed])` — the last of which does the write the way
+   ProseMirror will accept, which is not something to re-derive. Reach for these
+   before re-implementing them in a feature.
    If the feature pins UI to a passage of chat text, use `CPP.anchor` rather than
    rolling your own — see [Anchoring](#anchoring-text-to-a-virtualized-transcript).
 

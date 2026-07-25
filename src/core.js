@@ -91,12 +91,19 @@
       return m ? m[1] : null;
     },
 
-    // Normalize claude's several conversation-list response shapes to an array.
-    extractConversations: function (data) {
+    // Normalize claude's list endpoints to an array. They variously return a
+    // bare array, { <name>: [...] }, or { data: [...] } — and which one is not
+    // stable across endpoints or over time, so every caller goes through here
+    // rather than guessing at the call site.
+    extractList: function (data, name) {
       if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.conversations)) return data.conversations;
+      if (data && Array.isArray(data[name])) return data[name];
       if (data && Array.isArray(data.data)) return data.data;
       return [];
+    },
+
+    extractConversations: function (data) {
+      return util.extractList(data, "conversations");
     },
 
     // ---- composer ---------------------------------------------------------

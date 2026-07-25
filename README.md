@@ -84,24 +84,49 @@ Margin bookmarks for a conversation, the way an editor does them. Select a passa
 - The text stays highlighted in claude's brand clay, and a matching bookmark glyph pins itself
   in the **left margin** next to the first line. Click that glyph to clear it; bookmarking the
   exact same passage again clears it too.
-- Saved locally per chat (`cppBookmarks:<uuid>`) and restored on reopen. Bookmarks re-anchor as
+- Saved per chat (`cppBookmarks:<uuid>`) and restored on reopen. Bookmarks re-anchor as
   the transcript re-renders or is edited; one whose message has scrolled out of the render
   window simply hides until you scroll back, since the text it marks is off screen anyway.
-- Purely local — no network calls, nothing sent anywhere.
+- No backend of ours and no network calls of its own: the only place a bookmark travels is
+  `chrome.storage.sync`, which carries it to your other signed-in Chrome profiles.
 
 ### 🔖 Bookmarks page
 The bookmarks above only show while you're in the chat that owns them. This adds one place to
 see them all, modeled on claude's own **Chats** page.
 
 - A **Bookmarks** entry appears in the left sidebar, under **Customize**. Clicking it opens a
-  full-page list (`/bookmarks`) of every bookmark across all your chats, each showing its
-  passage and the chat it belongs to.
-- A **search** box filters by passage text or chat name, and a **chat** dropdown narrows the
-  list to a single conversation.
+  full-page list (`/bookmarks`) of every bookmark across all your chats, each row showing its
+  passage and, under it, the chat it came from.
+- A **search** box filters by passage text, chat name or project name, and a **Filter by**
+  dropdown narrows the list to a single conversation.
 - Click a bookmark to open its chat and scroll straight to the passage. Each row's **⋮** menu
   deletes that bookmark.
-- Chat names are read from claude's own conversations list; everything else comes from the
-  same on-device storage the Bookmarks feature writes, so there's nothing new to sync.
+- Chat and project titles are read from claude's own list endpoints and cached
+  (`cppChatNames`, `cppProjectNames`), so a refresh only re-requests them when some id is still
+  unresolved. Everything else comes from the storage the Bookmarks feature already writes.
+
+**Grouping.** A **Group by** dropdown in the header sections the list three ways. The choice is
+remembered and syncs across your profiles (`cppBookmarkGroupBy`), and a check marks the active
+one in the menu.
+
+| Mode        | Sections the list by                                                     |
+| ----------- | ------------------------------------------------------------------------ |
+| **Project** | the project each bookmark's chat belongs to — the default                 |
+| **Chat**    | the conversation each bookmark came from                                  |
+| **None**    | nothing — one flat list, the way the page looked before grouping existed  |
+
+- Headings are sorted by title, so the order doesn't shift as bookmarks come and go — with one
+  exception: under **Project**, chats with no known project collect under **Unsorted**, which is
+  always pinned last.
+- Which project a chat belongs to comes from the chat→project mapping `project-colors` learns
+  from claude's own traffic, not from a request of ours. A chat that mapping hasn't seen yet
+  sits under **Unsorted** until it has — visit it, or its project, and it moves on the next
+  refresh, without a reload.
+- A project heading leads with that project's color swatch when one is set — the same
+  `.cpp-proj-dot` `project-colors` draws on the projects list, read from the same `projectColors`
+  key, so recoloring a project updates the heading live.
+- Under **Chat**, the per-row chat name is dropped, since the heading above it already says so.
+- **Filter by** still applies on top: filtering to one chat leaves a single section.
 
 ### ⏸️ Draft mode
 Modeled on Claude Code's Shift+Tab mode switch. Press **Shift+Tab** in the message box
@@ -279,16 +304,25 @@ Use `CPP.util.icon(codepoint, rotate)` to build one; `styles/content.css` carrie
 
 ### Storage keys
 
-| Key                        | Shape                                 | Purpose                          |
-| -------------------------- | ------------------------------------- | -------------------------------- |
-| `projectColors`            | `{ [projectUuid]: "#rrggbb" }`        | user-chosen color per project    |
-| `convProject`              | `{ [conversationUuid]: projectUuid }` | learned chat→project mapping     |
-| `cppAsides:<conversationUuid>` | `[{ id, anchor, question, answer }]` | inline asides for one chat (one key per chat) |
-| `cppBookmarks:<conversationUuid>` | `[{ id, anchor }]`                 | bookmarks for one chat (one key per chat) |
-| `cppChatNames`             | `{ [conversationUuid]: name }`        | cached chat titles for the bookmarks page |
-| `cppBookmarkGoto`          | `{ id, anchor }`                      | transient: scroll target handed to the chat page after clicking a bookmark |
-| `cppPromptStash:<conversationUuid>` | `string`                     | the stashed prompt for one chat (one key per chat) |
-| `cppFeatures`              | `{ [featureId]: boolean }`            | per-feature enable/disable       |
+| Key                        | Shape                                 | Area   | Purpose                 |
+| -------------------------- | ------------------------------------- | ------ | ----------------------- |
+| `projectColors`            | `{ [projectUuid]: "#rrggbb" }`        | sync   | user-chosen color per project    |
+| `convProject`              | `{ [conversationUuid]: projectUuid }` | local  | learned chat→project mapping     |
+| `cppAsides:<conversationUuid>` | `[{ id, anchor, question, answer }]` | local | inline asides for one chat (one key per chat) |
+| `cppBookmarks:<conversationUuid>` | `[{ id, anchor }]`                 | sync  | bookmarks for one chat (one key per chat) |
+| `cppChatNames`             | `{ [conversationUuid]: name }`        | local  | cached chat titles for the bookmarks page |
+| `cppProjectNames`          | `{ [projectUuid]: name }`             | local  | cached project titles for the bookmarks page's project headings |
+| `cppBookmarkGroupBy`       | `"none" \| "project" \| "chat"`       | sync   | the bookmarks page's **Group by** choice |
+| `cppBookmarkGoto`          | `{ id, anchor }`                      | local  | transient: scroll target handed to the chat page after clicking a bookmark |
+| `cppPromptStash:<conversationUuid>` | `string`                     | local  | the stashed prompt for one chat (one key per chat) |
+| `cppFeatures`              | `{ [featureId]: boolean }`            | sync   | per-feature enable/disable       |
+
+**Area** is `chrome.storage.sync` (follows the user between their signed-in Chrome
+profiles) or `chrome.storage.local` (stays on the device). Features never pick an
+area themselves: they call `ctx.util.get`/`set`, which route each key by the
+allow-list in `src/storage-sync.js` — the single place to edit when a key should
+start or stop syncing. Bulky or device-scoped state (asides, the prompt stash, the
+title caches) stays local to respect sync's ~100KB / 8KB-per-item quotas.
 
 Everything keyed by a chat or project uuid is reaped when that chat/project is
 deleted — see [Deletion cleanup](#deletion-cleanup) below.

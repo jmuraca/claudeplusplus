@@ -16,7 +16,7 @@
   // Config and bookmarks sync; bulky or device-scoped state (asides, prompt
   // stash, title caches, device ids) stays on .local to respect sync's
   // ~100KB / 8KB-per-item / 512-item quotas.
-  var SYNC_KEYS = { cppFeatures: 1, projectColors: 1 };
+  var SYNC_KEYS = { cppFeatures: 1, projectColors: 1, cppBookmarkGroupBy: 1 };
   var SYNC_PREFIXES = ["cppBookmarks:"];
 
   function isSyncKey(k) {

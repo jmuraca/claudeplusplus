@@ -37,7 +37,8 @@
   background: inherit;
 }
 
-.cpp-bmpage-filtericon .cpp-icon {
+.cpp-bmpage-filtericon .cpp-icon,
+.cpp-bmpage-groupicon .cpp-icon {
   font-size: 16px;
 }
 
@@ -51,6 +52,27 @@
   flex-direction: column;
   gap: 2px;
   padding-top: 4px;
+}
+
+/* Group headers. Flex so that a project's .cpp-proj-dot (styled in content.css,
+   shared with the projects list) sizes and centers as a flex item the way it does
+   there — as an inline child its width/height would be ignored. */
+.cpp-bmpage-group-header {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: hsl(var(--text-300));
+  padding: 14px 12px 4px;
+  user-select: none;
+}
+
+/* Slightly tighter than the 8px gap the projects list uses: at 12px uppercase
+   the label reads better close to its swatch. */
+.cpp-bmpage-group-header .cpp-proj-dot {
+  margin-right: 6px;
 }
 
 .cpp-bmpage-row {

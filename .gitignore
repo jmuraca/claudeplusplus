@@ -5,3 +5,8 @@ claude-test-chat-*.html
 
 # Packaged build
 claudeplusplus.zip
+
+# A local copy of claude.ai's icon font, handy for looking up what a private-use
+# codepoint actually draws (see CPP.util.ICON). We never ship a font — our glyphs
+# render through claude's own document-wide @font-face — so it isn't source.
+anthropicons.woff2

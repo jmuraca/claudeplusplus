@@ -33,12 +33,29 @@
   var BM_PREFIX = "cppBookmarks:";
   var GOTO_KEY = "cppBookmarkGoto";
   var NAMES_KEY = "cppChatNames"; // cache of chatId -> human title
+  var PROJECT_NAMES_KEY = "cppProjectNames"; // cache of projectId -> human title
+  var GROUP_BY_KEY = "cppBookmarkGroupBy"; // the "Group by" choice, synced
+  // Both owned by the project-colors feature — the first learned from claude's
+  // traffic, the second picked by the user — and only ever read here. Grouping by
+  // project therefore shows a chat under "Unsorted" until that feature has seen
+  // it, and a project heading gets a color dot only once one is chosen there.
+  var CONV_PROJECT_KEY = "convProject";
+  var PROJECT_COLORS_KEY = "projectColors";
 
-  // Live page state. items/names feed the list; the two filter fields are the
-  // toolbar's current search term and chat selection.
+  // The grouping modes, in menu order, with their button/heading labels.
+  var GROUP_MODES = ["none", "project", "chat"];
+  var GROUP_LABELS = { none: "None", project: "Project", chat: "Chat" };
+
+  // Live page state. items/names feed the list; searchTerm/filterChatId are the
+  // toolbar's current search term and chat selection, and groupBy is how the
+  // list is sectioned. projectNames/convProjectMap back the project headings.
   var state = { items: [], names: {} };
   var searchTerm = "";
   var filterChatId = "";
+  var groupBy = "project"; // "none" | "project" | "chat"
+  var projectNames = {};   // projectId -> human title
+  var convProjectMap = {}; // chatId -> projectId
+  var projectColors = {};  // projectId -> "#rrggbb"
 
   var pageEl = null; // the overlay, or null when not shown
   var menuEl = null; // an open kebab menu, or null
@@ -57,6 +74,16 @@
   function nameFor(id) {
     var n = state.names[id];
     return n && n.trim() ? n : "Chat " + id.slice(0, 8);
+  }
+
+  function projectNameFor(id) {
+    var n = projectNames[id];
+    return n && n.trim() ? n : "Project " + id.slice(0, 8);
+  }
+
+  function projectNameForChat(chatId) {
+    var pid = convProjectMap[chatId];
+    return pid ? projectNameFor(pid) : "";
   }
 
   // ---------- load bookmarks + chat names ----------
@@ -103,28 +130,68 @@
       .catch(function () { return {}; });
   }
 
-  // Reload bookmarks, render what we have immediately, fill in names from the
-  // cache, and only hit the network when some chat still has no name — so routine
-  // refreshes (a delete, a cross-tab change) don't re-request the whole list.
+  // The same, for project titles. Ids are lower-cased to match convProject's,
+  // which project-colors normalizes the same way.
+  function fetchProjectNames() {
+    var org = ctx.util.getOrgId();
+    if (!org) return Promise.resolve({});
+    return fetch(
+      "/api/organizations/" + org + "/projects?limit=200",
+      { credentials: "same-origin" }
+    )
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (data) {
+        var map = {};
+        ctx.util.extractList(data, "projects").forEach(function (p) {
+          var id = ((p.uuid || p.id || "") + "").toLowerCase();
+          if (id && p.name) map[id] = p.name;
+        });
+        return map;
+      })
+      .catch(function () { return {}; });
+  }
+
+  // Reload bookmarks, render what we have immediately, fill in titles from the
+  // caches, and only hit the network for the side (chats, projects) that still
+  // has an unresolved id — so routine refreshes (a delete, a cross-tab change)
+  // don't re-request either list.
   function refresh() {
     loadAll().then(function (items) {
       state.items = items;
       renderList();
 
-      ctx.util.get(NAMES_KEY).then(function (d) {
-        var cached = (d && d[NAMES_KEY]) || {};
-        state.names = Object.assign({}, cached, state.names);
-        renderList();
-
-        var missing = state.items.some(function (it) { return !state.names[it.chatId]; });
-        if (!missing) return;
-        fetchChatNames().then(function (fresh) {
-          if (!fresh || !Object.keys(fresh).length) return;
-          state.names = Object.assign({}, state.names, fresh);
-          ctx.util.set(setObj(NAMES_KEY, state.names));
+      ctx.util
+        .get([NAMES_KEY, PROJECT_NAMES_KEY, CONV_PROJECT_KEY, PROJECT_COLORS_KEY])
+        .then(function (d) {
+          d = d || {};
+          state.names = Object.assign({}, d[NAMES_KEY] || {}, state.names);
+          projectNames = Object.assign({}, d[PROJECT_NAMES_KEY] || {}, projectNames);
+          convProjectMap = d[CONV_PROJECT_KEY] || {};
+          projectColors = d[PROJECT_COLORS_KEY] || {};
           renderList();
+
+          var net = [];
+          if (state.items.some(function (it) { return !state.names[it.chatId]; })) {
+            net.push(fetchChatNames().then(function (fresh) {
+              if (!fresh || !Object.keys(fresh).length) return;
+              state.names = Object.assign({}, state.names, fresh);
+              ctx.util.set(setObj(NAMES_KEY, state.names));
+            }));
+          }
+          // Only the projects that own a bookmarked chat need a title.
+          var needsProject = state.items.some(function (it) {
+            var pid = convProjectMap[it.chatId];
+            return pid && !projectNames[pid];
+          });
+          if (needsProject) {
+            net.push(fetchProjectNames().then(function (fresh) {
+              if (!fresh || !Object.keys(fresh).length) return;
+              projectNames = Object.assign({}, projectNames, fresh);
+              ctx.util.set(setObj(PROJECT_NAMES_KEY, projectNames));
+            }));
+          }
+          if (net.length) Promise.all(net).then(renderList);
         });
-      });
     });
   }
 
@@ -141,6 +208,34 @@
     'stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"></circle>' +
     '<line x1="14" y1="14" x2="10.5" y2="10.5"></line></svg>';
 
+  // One of the header's secondary dropdown buttons ("Group by Project", "Filter
+  // by All"). The class soup is claude's own Button recipe, copied verbatim from
+  // the /recents header so ours are pixel-identical; `slug` names the three hooks
+  // we grab afterwards (button, value text, chevron slot).
+  function toolbarButton(slug, label, value) {
+    return (
+      '<button type="button" class="cpp-bmpage-' + slug + 'btn cds-reset group/btn relative isolate inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap select-none border-0 outline-none focus-visible:outline-hidden rounded h-control font-sans text-body font-medium transition-shadow duration-fast focus-visible:shadow-focus text-primary px-md">' +
+      '  <span aria-hidden="true" class="absolute -z-[1] rounded-[inherit] transition-colors duration-fast bg-fill-secondary group-hover/btn:bg-fill-secondary-hover inset-0 cds-btn-squish shadow-field"></span>' +
+      '  <span class="inline-flex min-w-0 items-center gap-1"><span class="text-muted">' + label + "</span> " +
+      '<span class="cpp-bmpage-' + slug + 'val">' + value + "</span>" +
+      '<span class="cpp-bmpage-' + slug + 'icon shrink-0 opacity-60"></span></span>' +
+      "</button>"
+    );
+  }
+
+  // Wire one of those buttons up to the dropdown it opens.
+  function bindToolbarButton(root, slug, itemsFn) {
+    var btn = root.querySelector(".cpp-bmpage-" + slug + "btn");
+    root
+      .querySelector(".cpp-bmpage-" + slug + "icon")
+      .appendChild(ctx.util.icon(ctx.util.ICON.CHEVRON_DOWN));
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      openMenu(btn, itemsFn(), "left");
+    });
+  }
+
   function ensurePage() {
     if (pageEl) return;
     var root = document.createElement("div");
@@ -151,10 +246,8 @@
       '    <header class="@container mx-auto flex min-h-12 w-full max-w-4xl justify-between gap-md px-4 pt-3 md:px-8 items-center">' +
       '      <h1 class="font-heading text-2xl text-primary">Bookmarks</h1>' +
       '      <div class="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-sm">' +
-      '        <button type="button" class="cpp-bmpage-filterbtn cds-reset group/btn relative isolate inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap select-none border-0 outline-none focus-visible:outline-hidden rounded h-control font-sans text-body font-medium transition-shadow duration-fast focus-visible:shadow-focus text-primary px-md">' +
-      '          <span aria-hidden="true" class="absolute -z-[1] rounded-[inherit] transition-colors duration-fast bg-fill-secondary group-hover/btn:bg-fill-secondary-hover inset-0 cds-btn-squish shadow-field"></span>' +
-      '          <span class="inline-flex min-w-0 items-center gap-1"><span class="text-muted">Filter by</span> <span class="cpp-bmpage-filterval">All</span><span class="cpp-bmpage-filtericon shrink-0 opacity-60"></span></span>' +
-      "        </button>" +
+      toolbarButton("group", "Group by", GROUP_LABELS[groupBy]) +
+      toolbarButton("filter", "Filter by", "All") +
       "      </div>" +
       "    </header>" +
       '    <div class="relative mx-auto w-full max-w-4xl px-4 pt-4 md:px-8 pb-3">' +
@@ -176,22 +269,14 @@
     syncTheme();
 
     root.querySelector(".cpp-bmpage-searchicon").innerHTML = SEARCH_SVG;
-    root
-      .querySelector(".cpp-bmpage-filtericon")
-      .appendChild(ctx.util.icon(ctx.util.ICON.CHEVRON_DOWN));
+    bindToolbarButton(root, "group", groupByItems);
+    bindToolbarButton(root, "filter", filterItems);
 
     var search = root.querySelector(".cds-input");
     search.value = searchTerm;
     search.addEventListener("input", function () {
       searchTerm = search.value.trim().toLowerCase();
       renderList();
-    });
-
-    var filterBtn = root.querySelector(".cpp-bmpage-filterbtn");
-    filterBtn.addEventListener("click", function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      openMenu(filterBtn, filterItems(), "left");
     });
 
     renderList();
@@ -263,6 +348,26 @@
     if (v) v.textContent = filterChatId ? nameFor(filterChatId) : "All";
   }
 
+  function groupByItems() {
+    return GROUP_MODES.map(function (mode) {
+      return {
+        label: GROUP_LABELS[mode] + (groupBy === mode ? " \u2713" : ""),
+        onClick: function () {
+          groupBy = mode;
+          ctx.util.set(setObj(GROUP_BY_KEY, mode));
+          updateGroupByLabel();
+          renderList();
+        }
+      };
+    });
+  }
+
+  function updateGroupByLabel() {
+    if (!pageEl) return;
+    var v = pageEl.querySelector(".cpp-bmpage-groupval");
+    if (v) v.textContent = GROUP_LABELS[groupBy] || "Project";
+  }
+
   function emptyState(msg) {
     var el = document.createElement("div");
     el.className = "cpp-bmpage-empty";
@@ -279,11 +384,12 @@
       filterChatId = "";
     }
     updateFilterLabel();
+    updateGroupByLabel();
 
     var rows = state.items.filter(function (it) {
       if (filterChatId && it.chatId !== filterChatId) return false;
       if (searchTerm) {
-        var hay = ((it.anchor.quote || "") + " " + nameFor(it.chatId)).toLowerCase();
+        var hay = ((it.anchor.quote || "") + " " + nameFor(it.chatId) + " " + projectNameForChat(it.chatId)).toLowerCase();
         if (hay.indexOf(searchTerm) === -1) return false;
       }
       return true;
@@ -300,10 +406,62 @@
       listEl.appendChild(emptyState("No bookmarks match your search."));
       return;
     }
-    rows.forEach(function (it) { listEl.appendChild(buildRow(it)); });
+
+    if (groupBy === "none") {
+      rows.forEach(function (it) { listEl.appendChild(buildRow(it, true)); });
+      return;
+    }
+
+    // Section the rows. Storage order is arbitrary (it follows the bookmark
+    // keys), so headings are sorted by title with the catch-all "Unsorted"
+    // group — chats project-colors hasn't mapped yet — pinned to the end.
+    var groups = {};
+    rows.forEach(function (it) {
+      var gid = groupBy === "project" ? (convProjectMap[it.chatId] || "") : it.chatId;
+      if (!groups[gid]) groups[gid] = [];
+      groups[gid].push(it);
+    });
+    Object.keys(groups)
+      .map(function (gid) { return { gid: gid, title: groupTitle(gid) }; })
+      .sort(function (a, b) {
+        // "" is the project-less bucket, and sorts after every named one.
+        if (a.gid === "") return b.gid === "" ? 0 : 1;
+        if (b.gid === "") return -1;
+        return a.title.localeCompare(b.title);
+      })
+      .forEach(function (g) {
+        listEl.appendChild(groupHeader(g.gid, g.title));
+        // The heading already names the chat when that's what we grouped by.
+        groups[g.gid].forEach(function (it) {
+          listEl.appendChild(buildRow(it, groupBy !== "chat"));
+        });
+      });
   }
 
-  function buildRow(it) {
+  function groupTitle(gid) {
+    if (groupBy !== "project") return nameFor(gid);
+    return gid ? projectNameFor(gid) : "Unsorted";
+  }
+
+  // A section heading. When the section is a project the user has colored, it
+  // leads with the same swatch project-colors draws on the projects list —
+  // literally its .cpp-proj-dot, so the two stay identical if that style changes.
+  function groupHeader(gid, title) {
+    var hdr = document.createElement("div");
+    hdr.className = "cpp-bmpage-group-header";
+    var color = groupBy === "project" && gid ? projectColors[gid] : null;
+    if (color) {
+      var dot = document.createElement("span");
+      dot.className = "cpp-proj-dot";
+      dot.setAttribute("aria-hidden", "true");
+      dot.style.background = color;
+      hdr.appendChild(dot);
+    }
+    hdr.appendChild(document.createTextNode(title));
+    return hdr;
+  }
+
+  function buildRow(it, showChat) {
     var row = document.createElement("div");
     row.className = "cpp-bmpage-row";
 
@@ -316,11 +474,13 @@
     var quote = document.createElement("div");
     quote.className = "cpp-bmpage-quote";
     quote.textContent = it.anchor.quote || "(no text)";
-    var chat = document.createElement("div");
-    chat.className = "cpp-bmpage-chat";
-    chat.textContent = nameFor(it.chatId);
     main.appendChild(quote);
-    main.appendChild(chat);
+    if (showChat) {
+      var chat = document.createElement("div");
+      chat.className = "cpp-bmpage-chat";
+      chat.textContent = nameFor(it.chatId);
+      main.appendChild(chat);
+    }
     row.appendChild(main);
 
     var kebab = document.createElement("button");
@@ -613,8 +773,23 @@
     // Bookmarks live in chrome.storage.sync now, so refresh on "sync" changes
     // (from this or another machine) as well as any local writes.
     if ((area !== "local" && area !== "sync") || !pageEl) return;
+
+    // Another tab (or another machine) switched the grouping.
+    if (changes[GROUP_BY_KEY]) {
+      var saved = changes[GROUP_BY_KEY].newValue;
+      if (saved && GROUP_MODES.indexOf(saved) !== -1 && saved !== groupBy) {
+        groupBy = saved;
+        renderList();
+      }
+    }
+    // A bookmark changed, or project-colors learned a new chat→project pair (which
+    // can move a row out of "Unsorted") or recolored a project, while we're open.
     var touched = Object.keys(changes).some(function (k) {
-      return k.indexOf(BM_PREFIX) === 0;
+      return (
+        k.indexOf(BM_PREFIX) === 0 ||
+        k === CONV_PROJECT_KEY ||
+        k === PROJECT_COLORS_KEY
+      );
     });
     if (touched) refresh();
   }
@@ -666,6 +841,14 @@
         pendingGoto = (d && d[GOTO_KEY]) || null;
         if (pendingGoto) tryGoto();
       });
+      // The saved "Group by" choice. Landing straight on /bookmarks can build
+      // the page before this resolves, so re-render if it did.
+      ctx.util.get(GROUP_BY_KEY).then(function (d) {
+        var saved = d && d[GROUP_BY_KEY];
+        if (!saved || saved === groupBy || GROUP_MODES.indexOf(saved) === -1) return;
+        groupBy = saved;
+        renderList();
+      });
       try { chrome.storage.onChanged.addListener(onStorageChanged); } catch (e) {}
       window.addEventListener("resize", onResize);
     },
@@ -688,6 +871,10 @@
       state = { items: [], names: {} };
       searchTerm = "";
       filterChatId = "";
+      groupBy = "project";
+      projectNames = {};
+      convProjectMap = {};
+      projectColors = {};
       pendingGoto = null;
     }
   });

@@ -48,7 +48,8 @@
         "src/features/draft-mode.js",
         "src/features/export-chat.js",
         "src/features/prompt-stash.js",
-        "src/features/queue-edit.js"
+        "src/features/queue-edit.js",
+        "src/features/keyboard-shortcuts-inject.js"
       ],
       "css": ["styles/content.css", "styles/asides.css", "styles/bookmarks.css", "styles/bookmarks-page.css", "styles/emoji-autocomplete.css", "styles/draft-mode.css", "styles/scroll-nav.css", "styles/export-chat.css", "styles/prompt-stash.css", "styles/queue-edit.css"],
       "run_at": "document_start",

@@ -103,6 +103,13 @@
       description:
         "A message queued while Claude is replying can normally only be discarded. This makes it clickable: click a queued message (or focus it and press Enter) and its text returns to the message box — added to the end of whatever you've already typed — and it leaves the queue, so you can fix it up and send it again. The × beside it still discards.",
       defaultEnabled: true
+    },
+    {
+      id: "keyboard-shortcuts-inject",
+      name: "Keyboard shortcuts in help menu",
+      description:
+        "Adds Claude++ shortcuts (Alt+↑/↓ scroll, Shift+Tab draft, Ctrl+S stash) to claude.ai's Keyboard shortcuts dialog.",
+      defaultEnabled: true
     }
   ];
 })(typeof window !== "undefined" ? window : this);

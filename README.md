@@ -96,7 +96,8 @@ see them all, modeled on claude's own **Chats** page.
 
 - A **Bookmarks** entry appears in the left sidebar, under **Customize**. Clicking it opens a
   full-page list (`/bookmarks`) of every bookmark across all your chats, each row showing its
-  passage and, under it, the chat it came from.
+  passage and, under it, the chat it came from. The entry stays out of Claude Code
+  (`claude.ai/code`), which has its own nav and no chat passages to bookmark.
 - A **search** box filters by passage text, chat name or project name, and a **Filter by**
   dropdown narrows the list to a single conversation.
 - Click a bookmark to open its chat and scroll straight to the passage. Each row's **⋮** menu

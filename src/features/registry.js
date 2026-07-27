@@ -35,6 +35,13 @@
       defaultEnabled: true
     },
     {
+      id: "project-files-view",
+      name: "Grid or list view for project files",
+      description:
+        "Adds a grid/list switch to a project's Context panel. List view shows one row per file, naming it instead of leaving you to recognise an unlabelled thumbnail — click a name to open the same preview, tick rows to multi-select and delete as usual.",
+      defaultEnabled: true
+    },
+    {
       id: "tab-status",
       name: "Thinking status in tab title",
       description:

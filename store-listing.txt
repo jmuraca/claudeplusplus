@@ -26,6 +26,9 @@ Adds a "+ Create new project" option to the Add to project menu, so a loose chat
 🛡️ Delete guard
 Deleting a project on claude.ai silently deletes every chat, file, and artifact inside it. Claude++ hardens that dialog: it names what's being deleted, warns you what's included, and makes you type the project name to confirm — so nothing is lost to a stray click.
 
+🗂️ Grid or list view for project files
+A project's Context panel shows uploaded files as a wall of unlabelled thumbnails. Claude++ adds a grid/list switch to that panel: list view gives each file a row that names it, and opening, multi-selecting and deleting files all work exactly as before.
+
 ⏳ Thinking status in the tab title
 Every claude.ai tab looks the same in the tab strip. Claude++ prefixes the title with a status glyph: ⏳ while a response is streaming, ✅ when one finished in a background tab, and ⚠️ if it ended with an error — so you know which tab needs you.
 

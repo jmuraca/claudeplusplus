@@ -49,6 +49,27 @@ live the moment the dialog opens. This feature hardens that dialog:
 
 Works from both the projects list (`/cowork/projects`) and a single project's **⋯** menu.
 
+### 🗂️ Grid or list view for project files
+A project's **Context** panel shows uploaded files as a wall of 120px thumbnails. That reads
+well for a handful of images and badly for thirty PDFs with long, similar names — the name
+isn't drawn anywhere at all. This adds a **grid/list switch** to the panel header, next to
+Search and Add files.
+
+- **List view** gives each file a row: its kind chip and its full name.
+- Clicking a name opens the same preview modal the thumbnail does; the row checkbox feeds
+  claude's own multi-select, so selecting several and deleting them works exactly as before;
+  the row's **×** removes one file, like the × on a thumbnail.
+- Your choice is remembered per account (it rides `chrome.storage.sync`), so it follows you
+  to your other signed-in Chrome profiles.
+- Rows are a list Claude++ owns, not restyled thumbnails — the file name is only a
+  `data-testid` on the tile, so no amount of CSS can draw it. Every action on a row is
+  forwarded to the real control it mirrors, so nothing about opening, selecting or deleting
+  a file changes.
+- The real grid therefore stays in the document while the list shows (a control React has
+  unmounted can't be clicked). It's clipped to zero height and made `visibility:hidden`
+  rather than `display:none` so every tile keeps a truthful layout box — otherwise anything
+  claude anchors to a thumbnail would be positioned against the page's top-left corner.
+
 ### ⏳ Thinking status in tab title
 From the browser's tab strip every claude.ai tab looks identical, so you can't tell the
 one that's mid-response from the one that answered a while ago and is waiting on you.
@@ -341,6 +362,7 @@ Use `CPP.util.icon(codepoint, rotate)` to build one; `styles/content.css` carrie
 | `cppBookmarkGroupBy`       | `"none" \| "project" \| "chat"`       | sync   | the bookmarks page's **Group by** choice |
 | `cppBookmarkGoto`          | `{ id, anchor }`                      | local  | transient: scroll target handed to the chat page after clicking a bookmark |
 | `cppPromptStash:<conversationUuid>` | `string`                     | local  | the stashed prompt for one chat (one key per chat) |
+| `cppProjectFilesView`      | `"grid" \| "list"`                    | sync   | how a project's Context files are shown |
 | `cppFeatures`              | `{ [featureId]: boolean }`            | sync   | per-feature enable/disable       |
 
 **Area** is `chrome.storage.sync` (follows the user between their signed-in Chrome

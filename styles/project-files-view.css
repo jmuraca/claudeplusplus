@@ -1,0 +1,141 @@
+/* Claude++ — grid or list view for a project's files
+ *
+ * Two pieces: the pair of view buttons in the Context header, and the list that
+ * replaces the thumbnail wall. The buttons borrow claude's own button classes
+ * for sizing, hover and the pressed-state accent (see borrowedClasses in
+ * project-files-view.js), so there's nothing to style here but the icon box.
+ *
+ * Colours come from claude.ai's custom properties with fallbacks, so light/dark
+ * and any token retune follow without a change here. */
+
+/* ---- the view toggle ---- */
+
+.cpp-view-toggle {
+  display: inline-flex;
+  align-items: center;
+}
+
+.cpp-view-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- the real grid, while the list is showing ---- */
+
+/* The tiles have to stay in the document — the list forwards every click to
+   the real control it mirrors, and a control React has unmounted can't be
+   clicked. `visibility:hidden` (not `display:none`) so each tile keeps a real
+   layout box: anything claude anchors to a thumbnail is then positioned where
+   the thumbnail actually is, rather than against the page's top-left corner.
+   Height and margin go to zero so the collapsed grid takes up no room, and
+   overflow clips the tiles that now overhang it. */
+.cpp-files-source {
+  visibility: hidden !important;
+  height: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+/* ---- the list ---- */
+
+.cpp-files-list {
+  margin: 0.75rem 0 0; /* matches the grid's own mt-3 */
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid hsl(var(--border-300, 0 0% 85%) / 0.6);
+}
+
+.cpp-file-row {
+  display: grid;
+  /* checkbox · kind · name · remove */
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3125rem 0.25rem;
+  border-bottom: 1px solid hsl(var(--border-300, 0 0% 85%) / 0.6);
+}
+
+.cpp-file-row:hover {
+  background: hsl(var(--bg-200, 0 0% 96%) / 0.6);
+}
+
+/* A selected row reads as selected without a class to keep in step with the
+   checkbox — the checkbox itself is the state. */
+.cpp-file-row:has(.cpp-file-check:checked) {
+  background: hsl(var(--accent-100, 15 63% 60%) / 0.1);
+}
+
+.cpp-file-check {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: hsl(var(--accent-100, 15 63% 60%));
+  cursor: pointer;
+}
+
+/* The same uppercase extension chip the thumbnails wear along their bottom
+   edge, so a file reads the same in either view. */
+.cpp-file-kind {
+  min-width: 2.5rem;
+  padding: 0 0.25rem;
+  border: 1px solid hsl(var(--border-300, 0 0% 85%));
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  text-transform: uppercase;
+  color: hsl(var(--text-400, 0 0% 45%));
+}
+
+.cpp-file-name {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  text-align: left;
+  color: hsl(var(--text-200, 0 0% 20%));
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cpp-file-name:hover {
+  text-decoration: underline;
+}
+
+.cpp-file-name:focus-visible,
+.cpp-file-check:focus-visible,
+.cpp-file-remove:focus-visible {
+  outline: 2px solid hsl(var(--accent-100, 15 63% 60%));
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* The × stays out of the way until the row is pointed at — the same restraint
+   the thumbnail's own remove button shows — but is always there for the
+   keyboard, which has no hover to trigger it. */
+.cpp-file-remove {
+  padding: 0 0.25rem;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1;
+  color: hsl(var(--text-500, 0 0% 60%));
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease, color 120ms ease;
+}
+
+.cpp-file-row:hover .cpp-file-remove,
+.cpp-file-remove:focus-visible {
+  opacity: 1;
+}
+
+.cpp-file-remove:hover {
+  color: hsl(var(--text-200, 0 0% 20%));
+}

@@ -35,6 +35,20 @@
       defaultEnabled: true
     },
     {
+      id: "project-files-view",
+      name: "Grid or list view for project files",
+      description:
+        "Adds a grid/list switch to a project's Context panel. List view shows one row per file, naming it instead of leaving you to recognise an unlabelled thumbnail — click a name to open the same preview, tick rows to multi-select and delete as usual.",
+      defaultEnabled: true
+    },
+    {
+      id: "file-delete-guard",
+      name: "Delete file confirmation",
+      description:
+        "Removing a file from a project is instant and unprompted — the × sits under the pointer the moment you hover a thumbnail, and the bulk Delete takes the whole selection in one click. This asks first, naming what's about to go, for both a single file and a multi-select, in either grid or list view.",
+      defaultEnabled: true
+    },
+    {
       id: "tab-status",
       name: "Thinking status in tab title",
       description:

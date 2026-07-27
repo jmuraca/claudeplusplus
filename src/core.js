@@ -196,6 +196,30 @@
       return t.replace(/\u200b/g, "").trim();
     },
 
+    // An element's label as the "which control is this?" scans want it: its
+    // aria-label, title and text run together and lowercased. Several features
+    // hunt claude.ai's markup for a button by what it says (Share, pin,
+    // Delete), and each had grown its own copy of this.
+    //
+    // textContent, deliberately not plainText. plainText reads innerText, which
+    // the browser can only answer with up-to-date layout, so it forces a
+    // style+layout flush — and these scans run over every candidate button,
+    // in one case on every click in the page. The callers match words
+    // case-insensitively, so rendered whitespace and line breaks buy nothing.
+    labelOf: function (el) {
+      return (
+        (el.getAttribute("aria-label") || "") + " " +
+        (el.getAttribute("title") || "") + " " +
+        (el.textContent || "")
+      ).toLowerCase();
+    },
+
+    // Everything Claude++ injects carries data-cpp, so a feature watching the
+    // page for clicks can tell our own chrome from claude.ai's without naming
+    // other features' classes one by one — a list that silently rots as
+    // features are added.
+    OUR_UI: "[data-cpp]",
+
     // The message box's contents; "" when it's empty or unmounted. `ed` is
     // optional — the live editor is looked up when it's omitted.
     composerText: function (ed) {

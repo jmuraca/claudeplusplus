@@ -143,21 +143,13 @@
   }
 
   // ---- locate the header toolbar ------------------------------------------
-  function labelOf(el) {
-    return (
-      (el.getAttribute("aria-label") || "") + " " +
-      (el.getAttribute("title") || "") + " " +
-      (el.textContent || "")
-    ).toLowerCase();
-  }
-
   // Find the "pin project" button in the project header (ignore sidebar/nav).
   function findPinButton() {
     var els = document.querySelectorAll('button, [role="button"]');
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
       if (el.closest("nav, aside")) continue;
-      if (/\bpin\b/.test(labelOf(el))) return el;
+      if (/\bpin\b/.test(CPP.util.labelOf(el))) return el;
     }
     return null;
   }

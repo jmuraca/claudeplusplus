@@ -49,6 +49,81 @@ live the moment the dialog opens. This feature hardens that dialog:
 
 Works from both the projects list (`/cowork/projects`) and a single project's **⋯** menu.
 
+### 🗂️ Grid or list view for project files
+A project's **Context** panel shows uploaded files as a wall of 120px thumbnails. That reads
+well for a handful of images and badly for thirty PDFs with long, similar names — the name
+isn't drawn anywhere at all. This adds a **grid/list switch** to the panel header, next to
+Search and Add files.
+
+- **List view** gives each file a row: its kind chip and its full name.
+- Clicking a name opens the same preview modal the thumbnail does; the row checkbox feeds
+  claude's own multi-select, so selecting several and deleting them works exactly as before;
+  the row's **×** removes one file, like the × on a thumbnail.
+- Your choice is remembered per account (it rides `chrome.storage.sync`), so it follows you
+  to your other signed-in Chrome profiles.
+- Rows are a list Claude++ owns, not restyled thumbnails — the file name is only a
+  `data-testid` on the tile, so no amount of CSS can draw it. Every action on a row is
+  forwarded to the real control it mirrors, so nothing about opening, selecting or deleting
+  a file changes.
+- The real grid therefore stays in the document while the list shows (a control React has
+  unmounted can't be clicked). It's clipped to zero height and made `visibility:hidden`
+  rather than `display:none` so every tile keeps a truthful layout box — otherwise anything
+  claude anchors to a thumbnail would be positioned against the page's top-left corner.
+
+### 🗑️ Delete file confirmation
+Removing a file from a project's **Context** panel is instant and unprompted: the **×** sits
+under the pointer the moment you hover a thumbnail, and the bulk **Delete** that appears once
+files are ticked takes the whole selection in one click. Re-uploading is the only way back.
+This asks first.
+
+- Covers a **single file** and a **multi-select**, in either grid or list view, always naming
+  what's about to go:
+
+  > **Delete 2 files**
+  >
+  > Are you sure you want to delete 2 files from this project?
+  >
+  > ⚠️ This will permanently remove
+  > - EnergyTechMarketReadySupportEMRS2026FAQs 1.pdf
+  > - EnergyTechMarketReadySupportEMRS2026ApplicationGuidelines 1.pdf
+  >
+  > This can't be undone.
+
+- One file and many are the **same dialog at different sizes** — a count in the heading and
+  the question, the names in the list below — rather than a lone file being special-cased
+  into the heading and named inline.
+- Files are listed **one per line**, not run together in a sentence: claude's file names are
+  long and near-identical often enough (`…EMRS2026FAQs 1.pdf` beside
+  `…EMRS2026ApplicationGuidelines 1.pdf`) that a comma-separated run is unreadable at exactly
+  the moment it matters most. The list scrolls past a few items, so every name is shown in
+  full without the dialog growing off-screen.
+- The dialog wears the shared `.cpp-modal-*` shell (the same one the create-project dialog
+  uses) and the [project-delete dialog](#️-delete-guard)'s own `.cpp-del-warning` class, so
+  one edit restyles all three and they can't drift. The one thing that format drops is the
+  type-the-name box — deleting a file doesn't warrant making you spell it out.
+- **Cancel** holds focus, so a stray Enter on a dialog you didn't mean to open is the harmless
+  answer. Escape and a click on the backdrop also cancel; Tab is trapped between the two
+  buttons.
+- The click is caught in the **capture phase**, before React's own handler, so the delete is
+  stopped rather than confirmed after the fact. On confirm, the very same control is found
+  again and clicked with the guard standing down — the delete goes out through claude's own
+  code path, never ours, so a cancel leaves the page untouched.
+- The per-file **×** is recognised structurally (it's the button that is a direct child of a
+  thumbnail wrapper — the tile's own open button and its checkbox sit deeper in). The bulk
+  **Delete** has no such landmark, so it's matched on its label, but only while files are
+  actually selected — the state that button exists for. That pairing is what keeps the label
+  test from firing on unrelated buttons.
+- **A ticked file is not a checked checkbox.** claude keeps the selection in React state and
+  styles the box from it directly: a tile input carries no `checked` even while the tile is
+  plainly ticked, and React re-creates that input often enough that reading the property
+  returns "nothing selected" on a freshly rendered tile. So the drawn checkmark is the
+  fallback signal, and the selection count is *also* read off claude's own
+  *"Delete N selected items"* label — two independent readings, because either can come up
+  short, and failing to guard is the costlier mistake.
+- The row **×** in list view is deliberately skipped: it deletes nothing itself, it forwards
+  to the tile's ×, which *is* guarded — so the two views share one confirmation and can't
+  double-prompt.
+
 ### ⏳ Thinking status in tab title
 From the browser's tab strip every claude.ai tab looks identical, so you can't tell the
 one that's mid-response from the one that answered a while ago and is waiting on you.
@@ -96,7 +171,8 @@ see them all, modeled on claude's own **Chats** page.
 
 - A **Bookmarks** entry appears in the left sidebar, under **Customize**. Clicking it opens a
   full-page list (`/bookmarks`) of every bookmark across all your chats, each row showing its
-  passage and, under it, the chat it came from.
+  passage and, under it, the chat it came from. The entry stays out of Claude Code
+  (`claude.ai/code`), which has its own nav and no chat passages to bookmark.
 - A **search** box filters by passage text, chat name or project name, and a **Filter by**
   dropdown narrows the list to a single conversation.
 - Click a bookmark to open its chat and scroll straight to the passage. Each row's **⋮** menu
@@ -316,6 +392,22 @@ The module also owns the shared subscriber for claude.ai's selection tooltip
 (`onSelectionTooltip`), which is how **Ask** and **Bookmark** get into that popover —
 one poller for both, since they'd otherwise query the same node on the same frames.
 
+### The project Context panel
+
+Two features reach into a project's uploaded files — the grid/list switch and the delete
+confirmation — and both have to answer the same questions about claude.ai's markup: where
+the grid is, which tiles are in it, what each is called, whether it's ticked, which button
+removes it. `src/project-files.js` (loaded after `core.js`, exposed as `CPP.projectFiles`)
+owns those answers, the way `anchor.js` owns transcript anchoring, so a restyle on their
+side is a one-file fix on ours.
+
+It also records two traps worth knowing:
+
+| Trap | Why it matters |
+| ---- | -------------- |
+| **Selection is not `input.checked`** | claude keeps it in React state and styles the box from it directly. A ticked tile's input carries no `checked` at all, and React re-creates that input often enough that the property reads false on a freshly rendered tile — so `isSelected()` falls back to the drawn checkmark. Trusting the property once let the first bulk delete of a session through with no confirmation. |
+| **The remove × is the tile's *direct* child** | The preview button and the checkbox both sit deeper in, so "a button inside the tile" isn't specific enough to mean "the delete control". |
+
 ### Icons
 
 Chrome we add ourselves is drawn with **claude.ai's own icon font**, Anthropicons.
@@ -340,6 +432,7 @@ Use `CPP.util.icon(codepoint, rotate)` to build one; `styles/content.css` carrie
 | `cppBookmarkGroupBy`       | `"none" \| "project" \| "chat"`       | sync   | the bookmarks page's **Group by** choice |
 | `cppBookmarkGoto`          | `{ id, anchor }`                      | local  | transient: scroll target handed to the chat page after clicking a bookmark |
 | `cppPromptStash:<conversationUuid>` | `string`                     | local  | the stashed prompt for one chat (one key per chat) |
+| `cppProjectFilesView`      | `"grid" \| "list"`                    | sync   | how a project's Context files are shown |
 | `cppFeatures`              | `{ [featureId]: boolean }`            | sync   | per-feature enable/disable       |
 
 **Area** is `chrome.storage.sync` (follows the user between their signed-in Chrome

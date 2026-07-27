@@ -44,14 +44,6 @@
 
   // ---------- locate the header Share button ----------
 
-  function labelOf(el) {
-    return (
-      (el.getAttribute("aria-label") || "") + " " +
-      (el.getAttribute("title") || "") + " " +
-      (el.textContent || "")
-    ).toLowerCase();
-  }
-
   // The Share control in the conversation header (not anything in the sidebar).
   // claude.ai renders it as a button/anchor whose visible label is "Share".
   function findShareButton() {
@@ -59,7 +51,7 @@
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
       if (el.closest("nav, aside")) continue;
-      if (/\bshare\b/.test(labelOf(el))) return el;
+      if (/\bshare\b/.test(CPP.util.labelOf(el))) return el;
     }
     return null;
   }

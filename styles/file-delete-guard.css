@@ -1,0 +1,82 @@
+/* Claude++ — "are you sure" before a project file is deleted
+ *
+ * The shell — backdrop, centred panel, title, the actions row and its Cancel
+ * button — is the shared .cpp-modal-* set in content.css, the same one the
+ * create-project dialog wears. Only what a *confirmation* adds over a plain
+ * modal lives here: room for file names, the ⚠️ block, the list of what's
+ * going, and a destructive button where that modal has a primary one.
+ *
+ * The dialog hangs off <body>, outside React's tree, so a re-render of the
+ * Context panel can't disturb it while it's open. */
+
+/* Wider than .cpp-modal's 340px: this one has file names in it, and claude's
+   run long. */
+.cpp-confirm {
+  width: 26rem;
+}
+
+.cpp-confirm-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* The ⚠️ line. Its type and amber come from .cpp-del-warning in content.css —
+   the project-delete dialog's own warning class, shared so the two read
+   identically and one edit changes both. Only the placement is set here: the
+   12px above it is the same gap .cpp-del-guard opens up over there, which is
+   the blank line that sets the warning apart from the question. */
+.cpp-confirm .cpp-del-warning {
+  margin: 12px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.cpp-confirm-lead,
+.cpp-confirm-final {
+  margin: 0;
+}
+
+/* The blank line that sets "This can't be undone." apart from what's going. */
+.cpp-confirm-final {
+  margin-top: 0.75rem;
+}
+
+/* One file per line. claude's file names are long and near-identical often
+   enough that a comma-separated run is unreadable at exactly the moment it
+   matters most. Past a few items the list scrolls rather than growing the
+   dialog off-screen, so every name can be shown without truncating the list. */
+.cpp-confirm-files {
+  margin: 0.375rem 0 0;
+  padding-left: 1.25rem;
+  max-height: 8.5rem;
+  overflow-y: auto;
+  list-style: disc;
+}
+
+.cpp-confirm-files li {
+  margin: 0.125rem 0;
+}
+
+/* The destructive action, where .cpp-modal-save is a primary one. Sizing and
+   shape come from the shared button rule in content.css; only the colour is
+   set here. It is deliberately not the button holding focus. */
+.cpp-confirm-go {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+.cpp-confirm-go:hover {
+  filter: brightness(1.08);
+}
+
+/* The confirmation is reachable by keyboard throughout — it traps Tab between
+   the two buttons — so the focus ring has to be visible on them, which the
+   shared modal (driven from a text input) never needed. */
+.cpp-confirm-actions button:focus-visible,
+.cpp-modal-actions .cpp-confirm-go:focus-visible,
+.cpp-modal-actions .cpp-modal-cancel:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}

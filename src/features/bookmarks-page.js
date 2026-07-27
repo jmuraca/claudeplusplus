@@ -666,6 +666,24 @@
 
   var CLICKABLE = 'a, button, [role="menuitem"], [role="link"], [role="button"]';
 
+  // Claude Code is a different surface with its own nav — and bookmarks are
+  // chat-scoped, so the entry has nothing to offer there. It shares this
+  // sidebar (Customize row and all), so keep our row out and pull it back out
+  // if a navigation carried it in. Mode shows up two ways: the /code route, and
+  // the sidebar's Home/Code pill, which can flip the sidebar before the URL
+  // settles — trust either.
+  var CODE_RE = /^\/code(\/|$)/;
+  var CODE_PILL = '.df-pill[data-mode="code"][data-active="true"]';
+
+  function inCodeMode() {
+    return CODE_RE.test(location.pathname) || !!document.querySelector(CODE_PILL);
+  }
+
+  function removeNavItem() {
+    var item = document.getElementById("cpp-bm-navitem");
+    if (item && item.parentNode) item.parentNode.removeChild(item);
+  }
+
   // Icon fonts render as private-use / control codepoints in textContent; strip
   // them so a row like "<icon>Customize" compares as just "customize".
   function labelText(s) {
@@ -749,6 +767,7 @@
   }
 
   function ensureNavItem() {
+    if (inCodeMode()) { removeNavItem(); return; }
     if (document.getElementById("cpp-bm-navitem")) return;
     var anchor = findCustomize();
     if (!anchor) {

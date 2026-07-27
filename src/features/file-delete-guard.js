@@ -29,78 +29,17 @@
 
   var ctx = null;
 
-  var ITEM_SEL = '[class~="group/thumbnail"]';
   var DELETE_RE = /\b(delete|remove)\b/i;
+
+  // Where the panel, the tiles and the "is it ticked?" test live:
+  // CPP.projectFiles (src/project-files.js), shared with the grid/list view
+  // feature. That module also records why selection can't be read from
+  // input.checked — the trap that once let a bulk delete through unguarded.
+  var PF = null; // CPP.projectFiles, bound at init
 
   var bypass = false; // set while re-issuing a click the user has confirmed
   var dialog = null;
   var lastFocus = null;
-
-  // ---------- locating the panel ----------
-
-  function findGrid() {
-    var item = document.querySelector("ul > " + ITEM_SEL);
-    return item ? item.parentElement : null;
-  }
-
-  function findHeaderBar() {
-    var add = document.querySelector(
-      '[data-testid="project-doc-uploader-dropdown-trigger"]'
-    );
-    return add ? add.parentElement : null;
-  }
-
-  // The Context panel: the nearest ancestor holding both the file grid and the
-  // header's button row. Derived from those two landmarks rather than matched
-  // on a class, so it survives a restyle — and it's what scopes the label test
-  // below to this panel instead of the whole page.
-  function panelRoot() {
-    var grid = findGrid();
-    if (!grid) return null;
-    var bar = findHeaderBar();
-    if (!bar) return grid.parentElement;
-    var el = grid;
-    while (el && !el.contains(bar)) el = el.parentElement;
-    return el || grid.parentElement;
-  }
-
-  function labelOf(el) {
-    return (
-      (el.getAttribute("aria-label") || "") + " " +
-      (el.getAttribute("title") || "") + " " +
-      (ctx ? ctx.util.plainText(el) : el.textContent || "")
-    );
-  }
-
-  function nameOf(item) {
-    var tile = item.querySelector("[data-testid]");
-    return (tile && tile.getAttribute("data-testid")) || "";
-  }
-
-  function items(grid) {
-    return Array.prototype.slice.call(
-      grid.querySelectorAll(":scope > " + ITEM_SEL)
-    );
-  }
-
-  // Is this tile ticked? Deliberately not `input.checked` alone. claude keeps
-  // the selection in React state and styles the box from it directly — the tile
-  // inputs carry no `checked` even while plainly ticked — and React re-creates
-  // that input often enough that the property reads false on a freshly rendered
-  // tile. The drawn checkmark is what actually says "selected", so it's the
-  // fallback. Trusting the property alone is what let the first bulk delete of
-  // a session through unguarded.
-  function isSelected(item) {
-    var box = item.querySelector('input[type="checkbox"]');
-    if (!box) return false;
-    if (box.checked) return true;
-    var label = box.closest("label") || box.parentElement;
-    return !!(label && label.querySelector("svg"));
-  }
-
-  function selectedNames(grid) {
-    return items(grid).filter(isSelected).map(nameOf).filter(Boolean);
-  }
 
   // ---------- classifying a click ----------
 
@@ -108,24 +47,22 @@
   // Re-found rather than remembered, since React is free to re-render the
   // toolbar while the confirmation is open.
   function findBulkButton() {
-    var panel = panelRoot();
-    var grid = findGrid();
+    var grid = PF.grid();
+    var panel = PF.panelRoot(grid);
     if (!panel || !grid) return null;
     var els = panel.querySelectorAll('button, [role="button"]');
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
-      if (grid.contains(el) || el.closest(".cpp-files-list, .cpp-confirm")) continue;
-      if (DELETE_RE.test(labelOf(el))) return el;
+      if (grid.contains(el) || el.closest(ctx.util.OUR_UI)) continue;
+      if (DELETE_RE.test(ctx.util.labelOf(el))) return el;
     }
     return null;
   }
 
   function findTileRemove(name) {
-    var grid = findGrid();
-    if (!grid) return null;
-    var list = items(grid);
+    var list = PF.tiles();
     for (var i = 0; i < list.length; i++) {
-      if (nameOf(list[i]) === name) return list[i].querySelector(":scope > button");
+      if (PF.nameOf(list[i]) === name) return PF.removeButton(list[i]);
     }
     return null;
   }
@@ -134,15 +71,18 @@
   // that isn't a delete, which is nearly all of them — so the common path is
   // two cheap checks and out.
   function classify(el) {
-    var grid = findGrid();
-
-    var item = el.closest(ITEM_SEL);
+    // The tile branch first: it is decided by the click's own ancestors, so it
+    // costs nothing. Only if that misses do we pay for a document query — and
+    // only after the label test, the cheapest way to rule out the overwhelming
+    // majority of clicks.
+    var item = el.closest(PF.ITEM_SEL);
     if (item) {
+      var grid = PF.grid();
       if (!grid || !grid.contains(item)) return null;
       // Only the tile's own × — a direct child of the wrapper. The thumbnail's
       // open button and the select checkbox both sit deeper in.
       if (el.parentElement !== item) return null;
-      var name = nameOf(item);
+      var name = PF.nameOf(item);
       if (!name) return null;
       return {
         count: 1,
@@ -151,13 +91,14 @@
       };
     }
 
-    var label = labelOf(el);
+    var label = ctx.util.labelOf(el);
     if (!DELETE_RE.test(label)) return null;
     // A bulk delete only means anything when files are selected; requiring that
     // is what stops the label test from firing on unrelated buttons. Two
     // independent readings of "how many", because either can come up short:
     // the tiles, and claude's own "Delete N selected item(s)" on the button.
-    var names = grid ? selectedNames(grid) : [];
+    var bulkGrid = PF.grid();
+    var names = bulkGrid ? PF.selectedNames(bulkGrid) : [];
     var m = /(\d+)\s+selected/i.exec(label);
     var count = names.length || (m ? parseInt(m[1], 10) : 0);
     if (!count) return null;
@@ -165,7 +106,7 @@
     // page out of this. When the panel can't be located at all, a label that
     // counts the selection itself ("Delete 2 selected items") is specific
     // enough to stand on its own — and not guarding is the costlier mistake.
-    var panel = panelRoot();
+    var panel = PF.panelRoot(bulkGrid);
     if (panel ? !panel.contains(el) : !m) return null;
     return {
       count: count,
@@ -180,13 +121,19 @@
 
   function onClickCapture(e) {
     if (bypass) return;
+    // This sees every click in the page and nearly all of them are irrelevant,
+    // so the early-out is ordered cheapest first: a regex on the URL rules out
+    // every chat and settings page before any DOM is touched.
+    if (!ctx.util.currentProjectId()) return;
     var el = e.target && e.target.closest
       ? e.target.closest('button, [role="button"]')
       : null;
     if (!el) return;
-    // Our own list's × forwards to the tile's ×, which is the click that gets
-    // guarded — intercepting both would prompt twice.
-    if (el.closest(".cpp-files-list, .cpp-confirm")) return;
+    // Anything Claude++ drew is not claude.ai's delete. The list view's row ×
+    // forwards to the tile's ×, which is the click that gets guarded, and the
+    // dialog's own Delete button is a labelled delete sitting inside the panel
+    // — intercepting either would prompt twice or trap the confirmation.
+    if (el.closest(ctx.util.OUR_UI)) return;
     var target = classify(el);
     if (!target) return;
     e.preventDefault();
@@ -211,7 +158,7 @@
   // True when every file at stake could be named. A bulk delete whose count
   // came off claude's button label may know how many without knowing which.
   function named(target) {
-    return target.names.length > 0 && target.names.length === target.count;
+    return target.names.length > 0;
   }
 
   // One file and many read the same way — a count in the heading and the
@@ -220,16 +167,6 @@
   // same dialog looked like two different dialogs.
   function countOf(target) {
     return target.count + " " + plural(target.count);
-  }
-
-  function titleFor(target) {
-    return "Delete " + countOf(target);
-  }
-
-  function askFor(target) {
-    return (
-      "Are you sure you want to delete " + countOf(target) + " from this project?"
-    );
   }
 
   // The warning block: the ⚠️ lead, what's going, then "This can't be undone."
@@ -304,23 +241,28 @@
     lastFocus = document.activeElement;
 
     var back = document.createElement("div");
-    back.className = "cpp-confirm-backdrop";
+    back.className = "cpp-modal-overlay";
+    // Marks it as ours, so the click guard doesn't read the dialog's own
+    // Delete button as a delete to confirm (see CPP.util.OUR_UI).
+    back.dataset.cpp = "confirm";
 
     var box = document.createElement("div");
-    box.className = "cpp-confirm";
+    box.className = "cpp-modal cpp-confirm";
     box.setAttribute("role", "alertdialog");
     box.setAttribute("aria-modal", "true");
 
     var title = document.createElement("h2");
-    title.className = "cpp-confirm-title";
+    title.className = "cpp-modal-title";
     title.id = "cpp-confirm-title";
-    title.textContent = titleFor(target);
+    title.textContent = "Delete " + countOf(target);
     box.setAttribute("aria-labelledby", title.id);
 
     var body = document.createElement("p");
     body.className = "cpp-confirm-body";
     body.id = "cpp-confirm-body";
-    body.textContent = askFor(target);
+    body.textContent =
+      "Are you sure you want to delete " + countOf(target) +
+      " from this project?";
     box.setAttribute("aria-describedby", body.id);
 
     // Wears the same class the project-delete warning does, so both dialogs
@@ -328,11 +270,11 @@
     var warning = buildWarning(target);
 
     var actions = document.createElement("div");
-    actions.className = "cpp-confirm-actions";
+    actions.className = "cpp-modal-actions";
 
     var cancel = document.createElement("button");
     cancel.type = "button";
-    cancel.className = "cpp-confirm-cancel";
+    cancel.className = "cpp-modal-cancel";
     cancel.textContent = "Cancel";
     cancel.addEventListener("click", close);
 
@@ -387,6 +329,7 @@
 
     onInit: function (c) {
       ctx = c;
+      PF = CPP.projectFiles;
       document.addEventListener("click", onClickCapture, true);
     },
 

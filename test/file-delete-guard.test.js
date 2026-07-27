@@ -19,6 +19,11 @@ const SOURCE = fs.readFileSync(
   "utf8"
 );
 
+const PROJECT_FILES = fs.readFileSync(
+  path.join(__dirname, "..", "src", "project-files.js"),
+  "utf8"
+);
+
 const PAGE = `
 <div class="w-full px-[1.375rem] py-4 flex flex-col gap-2 mb-1" id="panel">
   <div class="h-6 w-full flex flex-row items-center justify-between gap-4">
@@ -84,7 +89,15 @@ function harness() {
 
   window.CPP = {
     util: {
+      currentProjectId: () => "42028720-ea8b-49d9-8881-9a33822f6a71",
       // Mirrors core.js.
+      labelOf: (el) =>
+        (
+          (el.getAttribute("aria-label") || "") + " " +
+          (el.getAttribute("title") || "") + " " +
+          (el.textContent || "")
+        ).toLowerCase(),
+      OUR_UI: "[data-cpp]",
       plainText: (el) =>
         (el ? (el.innerText != null ? el.innerText : el.textContent || "") : "")
           .replace(/​/g, "")
@@ -95,6 +108,7 @@ function harness() {
     }
   };
 
+  new window.Function(PROJECT_FILES).call(window);
   new window.Function(SOURCE).call(window);
   const feature = window.CPP.feature;
   feature.onInit(window.CPP);
@@ -103,7 +117,7 @@ function harness() {
   const click = (el) =>
     el.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
   const press = (key) =>
-    document.querySelector(".cpp-confirm-backdrop").dispatchEvent(
+    document.querySelector(".cpp-modal-overlay").dispatchEvent(
       new window.KeyboardEvent("keydown", { key, bubbles: true, cancelable: true })
     );
   const dialog = () => document.querySelector(".cpp-confirm");
@@ -113,7 +127,7 @@ function harness() {
   const lead = () => document.querySelector(".cpp-confirm-lead").textContent;
   const listed = () =>
     Array.from(document.querySelectorAll(".cpp-confirm-files li"), (li) => li.textContent);
-  const titleText = () => document.querySelector(".cpp-confirm-title").textContent;
+  const titleText = () => document.querySelector(".cpp-modal-title").textContent;
 
   // Tick files the way claude really does: it keeps the selection in its own
   // state, restyles the box and draws the checkmark, and leaves the input's
@@ -177,7 +191,7 @@ test("confirming re-issues the click on claude's own control", () => {
 test("cancelling deletes nothing", () => {
   const h = harness();
   h.click(h.$("remove-0"));
-  h.click(h.document.querySelector(".cpp-confirm-cancel"));
+  h.click(h.document.querySelector(".cpp-modal-cancel"));
   assert.equal(h.dialog(), null);
   assert.deepEqual(h.reached, []);
 });
@@ -193,7 +207,7 @@ test("Escape cancels", () => {
 test("Cancel holds focus, so a stray Enter is the harmless answer", () => {
   const h = harness();
   h.click(h.$("remove-0"));
-  assert.equal(h.document.activeElement, h.document.querySelector(".cpp-confirm-cancel"));
+  assert.equal(h.document.activeElement, h.document.querySelector(".cpp-modal-cancel"));
 });
 
 test("a bulk delete is stopped and names the whole selection", () => {
@@ -277,18 +291,40 @@ test("a delete elsewhere on the page is none of our business", () => {
 
 test("the list view's own × is skipped so it can't double-prompt", () => {
   // It deletes nothing itself — it forwards to the tile's ×, which is the click
-  // the guard is meant to catch.
+  // the guard is meant to catch. Recognised by the data-cpp stamp every
+  // Claude++ surface carries (CPP.util.OUR_UI), not by naming that feature's
+  // classes here, so the two features aren't coupled through a string.
   const h = harness();
   const list = h.document.createElement("ul");
   list.className = "cpp-files-list";
+  list.dataset.cpp = "file-list";
   list.innerHTML = '<li><button id="row-x" aria-label="Remove alpha.pdf"></button></li>';
   h.$("grid").insertAdjacentElement("afterend", list);
   h.$("row-x").addEventListener("click", () => h.click(h.$("remove-0")));
 
+  // Select a file first, so a delete-labelled button outside a tile WOULD
+  // otherwise classify — without that the row × is ignored for the wrong reason
+  // and the skip isn't really under test.
+  h.selectFiles(["check-0"]);
   h.click(h.$("row-x"));
   assert.equal(h.document.querySelectorAll(".cpp-confirm").length, 1, "exactly one dialog");
+  assert.equal(h.titleText(), "Delete 1 file", "the tile's × is what got classified");
   h.click(h.document.querySelector(".cpp-confirm-go"));
   assert.deepEqual(h.reached, ["row-x", "remove-0"]);
+});
+
+test("the dialog's own Delete button doesn't re-enter the guard", () => {
+  // It is a delete-labelled button sitting inside the panel's page while files
+  // are selected — exactly the shape the bulk branch looks for. The data-cpp
+  // stamp on the dialog is what keeps confirming from re-opening a confirmation.
+  const h = harness();
+  h.selectFiles(["check-0", "check-1"]);
+  h.click(h.$("bulk-delete"));
+  const go = h.document.querySelector(".cpp-confirm-go");
+  assert.ok(go.closest("[data-cpp]"), "the dialog is stamped as ours");
+  h.click(go);
+  assert.equal(h.dialog(), null, "it closed rather than prompting again");
+  assert.deepEqual(h.reached, ["bubbled:bulk-delete", "bulk-delete"]);
 });
 
 test("a re-render between asking and confirming doesn't lose the delete", () => {

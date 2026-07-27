@@ -97,9 +97,10 @@ This asks first.
   `…EMRS2026ApplicationGuidelines 1.pdf`) that a comma-separated run is unreadable at exactly
   the moment it matters most. The list scrolls past a few items, so every name is shown in
   full without the dialog growing off-screen.
-- The amber **⚠️** notice wears the [project-delete dialog](#️-delete-guard)'s own warning
-  class, so one edit restyles both and they can't drift. The one thing that format drops is
-  the type-the-name box — deleting a file doesn't warrant making you spell it out.
+- The dialog wears the shared `.cpp-modal-*` shell (the same one the create-project dialog
+  uses) and the [project-delete dialog](#️-delete-guard)'s own `.cpp-del-warning` class, so
+  one edit restyles all three and they can't drift. The one thing that format drops is the
+  type-the-name box — deleting a file doesn't warrant making you spell it out.
 - **Cancel** holds focus, so a stray Enter on a dialog you didn't mean to open is the harmless
   answer. Escape and a click on the backdrop also cancel; Tab is trapped between the two
   buttons.
@@ -390,6 +391,22 @@ an earlier message renumbers every `data-rs-index` after it.
 The module also owns the shared subscriber for claude.ai's selection tooltip
 (`onSelectionTooltip`), which is how **Ask** and **Bookmark** get into that popover —
 one poller for both, since they'd otherwise query the same node on the same frames.
+
+### The project Context panel
+
+Two features reach into a project's uploaded files — the grid/list switch and the delete
+confirmation — and both have to answer the same questions about claude.ai's markup: where
+the grid is, which tiles are in it, what each is called, whether it's ticked, which button
+removes it. `src/project-files.js` (loaded after `core.js`, exposed as `CPP.projectFiles`)
+owns those answers, the way `anchor.js` owns transcript anchoring, so a restyle on their
+side is a one-file fix on ours.
+
+It also records two traps worth knowing:
+
+| Trap | Why it matters |
+| ---- | -------------- |
+| **Selection is not `input.checked`** | claude keeps it in React state and styles the box from it directly. A ticked tile's input carries no `checked` at all, and React re-creates that input often enough that the property reads false on a freshly rendered tile — so `isSelected()` falls back to the drawn checkmark. Trusting the property once let the first bulk delete of a session through with no confirmation. |
+| **The remove × is the tile's *direct* child** | The preview button and the checkbox both sit deeper in, so "a button inside the tile" isn't specific enough to mean "the delete control". |
 
 ### Icons
 

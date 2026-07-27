@@ -15,12 +15,6 @@
   align-items: center;
 }
 
-.cpp-view-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
 /* ---- the real grid, while the list is showing ---- */
 
 /* The tiles have to stay in the document — the list forwards every click to

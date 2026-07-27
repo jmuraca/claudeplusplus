@@ -32,47 +32,16 @@
 
   var view = "grid";
   var loaded = false; // stored preference has been read
+  var mounted = false; // we have chrome in the page right now
 
-  // A file tile. Tailwind's `group/thumbnail` is matched as a class token
-  // rather than written into a selector, where the slash would need escaping.
-  var ITEM_SEL = '[class~="group/thumbnail"]';
-
-  // The thumbnail URL is /api/<org>/files/<fileUuid>/thumbnail — the only place
-  // in the panel that names a file by id.
-  var FILE_ID_RE = /\/files\/([0-9a-f-]{8,})\//i;
-
-  // ---------- reading claude's grid ----------
-
-  function findGrid() {
-    var item = document.querySelector("ul > " + ITEM_SEL);
-    return item ? item.parentElement : null;
-  }
-
-  // The header's button row, found via the uploader's testid rather than any
-  // visible label, so it doesn't depend on the interface language.
-  function findHeaderBar() {
-    var add = document.querySelector(
-      '[data-testid="project-doc-uploader-dropdown-trigger"]'
-    );
-    return add ? add.parentElement : null;
-  }
+  // Where the grid, the tiles and the "is it ticked?" test live: CPP.projectFiles
+  // (src/project-files.js), shared with the delete-confirmation feature so one
+  // restyle on claude's side is a one-file fix on ours.
+  var PF = null; // CPP.projectFiles, bound at init
 
   function extOf(name) {
     var m = /\.([a-z0-9]+)$/i.exec(name || "");
     return m ? m[1] : "";
-  }
-
-  // Is this tile ticked? Deliberately not `input.checked` alone. claude keeps
-  // the selection in React state and styles the checkbox from it directly — the
-  // tile inputs carry no `checked` even while plainly ticked — and React
-  // re-creates that input often enough that the property reads false on a
-  // freshly rendered tile. The drawn checkmark is what actually says
-  // "selected", so it's the fallback.
-  function isSelected(box) {
-    if (!box) return false;
-    if (box.checked) return true;
-    var label = box.closest("label") || box.parentElement;
-    return !!(label && label.querySelector("svg"));
   }
 
   // One descriptor per tile, holding the live controls a row forwards to.
@@ -80,43 +49,31 @@
   // is ever cached across renders.
   function readFiles(grid) {
     var out = [];
-    var items = grid.querySelectorAll(":scope > " + ITEM_SEL);
-    for (var i = 0; i < items.length; i++) {
-      var item = items[i];
-      var tile = item.querySelector("[data-testid]");
-      var name = tile && tile.getAttribute("data-testid");
-      if (!name) continue; // an upload still in flight has no tile yet
-      var img = item.querySelector("img");
-      var m = img && FILE_ID_RE.exec(img.getAttribute("src") || "");
-      var badge = tile.querySelector("p");
+    PF.tiles(grid).forEach(function (item) {
+      var name = PF.nameOf(item);
+      if (!name) return; // an upload still in flight has no tile yet
       out.push({
+        item: item,
         name: name,
-        id: m ? m[1].toLowerCase() : "",
-        kind: (badge ? ctx.util.plainText(badge) : "") || extOf(name),
-        open: tile.querySelector("button"),
-        check: item.querySelector('input[type="checkbox"]'),
-        // The × is a direct child of the tile wrapper; the tile's own buttons
-        // are nested inside it.
-        remove: item.querySelector(":scope > button")
+        kind: PF.kindOf(item) || extOf(name),
+        open: PF.openButton(item),
+        check: PF.checkbox(item),
+        remove: PF.removeButton(item)
       });
-    }
+    });
     return out;
   }
 
-  // The live descriptor a row stands for. Rows keep ids, not node references:
-  // a re-render between building the row and clicking it would leave any
-  // captured node detached, and the click would go nowhere.
+  // The live descriptor a row stands for. Rows keep the file name, not a node
+  // reference: a re-render between building the row and clicking it would leave
+  // any captured node detached, and the click would go nowhere. The name is key
+  // enough — claude already dedupes it, appending a counter ("report 1.pdf"),
+  // and it is what the delete guard matches on too.
   function lookup(row) {
-    var grid = findGrid();
-    if (!grid) return null;
-    var files = readFiles(grid);
-    var id = row.dataset.cppId;
-    var name = row.dataset.cppName;
-    var i;
-    if (id) {
-      for (i = 0; i < files.length; i++) if (files[i].id === id) return files[i];
+    var files = readFiles(PF.grid());
+    for (var i = 0; i < files.length; i++) {
+      if (files[i].name === row.dataset.cppName) return files[i];
     }
-    for (i = 0; i < files.length; i++) if (files[i].name === name) return files[i];
     return null;
   }
 
@@ -158,12 +115,9 @@
   // which is what marks the active view. The uploader's trailing `-mr-2` is
   // dropped: that nudge belongs to the last button in the row, not to ours.
   function borrowedClasses(bar) {
-    var btns = bar.querySelectorAll('button[data-cds="Button"]');
-    for (var i = 0; i < btns.length; i++) {
-      if (btns[i].closest(".cpp-view-toggle")) continue;
-      return (" " + btns[i].className + " ").replace(/\s-mr-2\s/, " ").trim();
-    }
-    return "";
+    var btn = bar.querySelector('button[data-cds="Button"]');
+    if (!btn) return "";
+    return (" " + btn.className + " ").replace(/\s-mr-2\s/, " ").trim();
   }
 
   function makeViewBtn(bar, mode, label, icon) {
@@ -183,11 +137,13 @@
     if (!group) {
       group = document.createElement("div");
       group.className = "cpp-view-toggle";
+      group.dataset.cpp = "view-toggle";
       group.setAttribute("role", "group");
       group.setAttribute("aria-label", "File view");
       group.appendChild(makeViewBtn(bar, "grid", "Grid view", gridIcon));
       group.appendChild(makeViewBtn(bar, "list", "List view", listIcon));
       bar.insertBefore(group, bar.firstChild);
+      mounted = true;
     }
     // Written only when it differs — our own attribute writes come back round
     // as mutations, and an unconditional set would re-trigger apply forever.
@@ -214,7 +170,7 @@
   function buildRow(f) {
     var row = document.createElement("li");
     row.className = "cpp-file-row";
-    row.dataset.cppId = f.id;
+    row.dataset.cpp = "file-row";
     row.dataset.cppName = f.name;
 
     var check = document.createElement("input");
@@ -267,7 +223,9 @@
     if (!list || !list.classList.contains("cpp-files-list")) {
       list = document.createElement("ul");
       list.className = "cpp-files-list";
+      list.dataset.cpp = "file-list";
       grid.insertAdjacentElement("afterend", list);
+      mounted = true;
     }
 
     // Rebuild only when the rows would actually differ. Everything a row draws
@@ -275,7 +233,7 @@
     // and rebuilding regardless would feed our own mutations back into apply.
     var sig = files
       .map(function (f) {
-        return [f.id, f.name, f.kind].join("");
+        return [f.name, f.kind].join("");
       })
       .join("");
     if (list.dataset.cppSig !== sig) {
@@ -288,10 +246,16 @@
 
     // Selection is claude's to own, so it's mirrored on every pass. Assigning
     // the `checked` property changes no attribute and so raises no mutation.
-    var rows = list.children;
-    for (var i = 0; i < rows.length && i < files.length; i++) {
-      var box = rows[i].querySelector(".cpp-file-check");
-      if (box) box.checked = isSelected(files[i].check);
+    var sel = files.map(function (f) {
+      return PF.isSelected(f.item) ? "1" : "0";
+    }).join("");
+    if (list.dataset.cppSel !== sel) {
+      list.dataset.cppSel = sel;
+      var rows = list.children;
+      for (var i = 0; i < rows.length && i < files.length; i++) {
+        var box = rows[i].querySelector(".cpp-file-check");
+        if (box) box.checked = sel.charAt(i) === "1";
+      }
     }
     return list;
   }
@@ -301,44 +265,55 @@
     if (list) list.remove();
   }
 
-  function setSourceHidden(grid, hidden) {
-    if (grid.classList.contains("cpp-files-source") !== hidden) {
-      grid.classList.toggle("cpp-files-source", hidden);
-    }
-  }
-
   function cleanup() {
+    if (!mounted) return;
+    mounted = false;
     var group = document.querySelector(".cpp-view-toggle");
     if (group) group.remove();
     dropList();
-    var hidden = document.querySelectorAll(".cpp-files-source");
-    for (var i = 0; i < hidden.length; i++) {
-      hidden[i].classList.remove("cpp-files-source");
-    }
+    var source = document.querySelector(".cpp-files-source");
+    if (source) source.classList.remove("cpp-files-source");
   }
 
   // ---------- lifecycle ----------
 
   function render() {
     if (!loaded || !ctx) return;
-    var pid = ctx.util.currentProjectId();
-    var grid = pid ? findGrid() : null;
+    var grid = ctx.util.currentProjectId() ? PF.grid() : null;
     if (!grid) return cleanup();
 
-    var bar = findHeaderBar();
+    var bar = PF.headerBar();
     if (bar) ensureToggle(bar);
 
-    var files = readFiles(grid);
-    // With nothing uploaded there's no list to draw, so claude's own empty
+    // Only list view reads the tiles, and grid is the default — while apply
+    // runs several times a second on a busy page, a pass that isn't going to
+    // draw a list shouldn't build a descriptor (six DOM queries) per tile.
+    // firstElementChild answers "is anything uploaded?" on its own. With
+    // nothing uploaded there's no list to draw either, so claude's own empty
     // state stays visible whichever view is selected.
-    if (view !== "list" || !files.length) {
-      setSourceHidden(grid, false);
+    var files =
+      view === "list" && grid.firstElementChild ? readFiles(grid) : [];
+    if (!files.length) {
+      grid.classList.toggle("cpp-files-source", false);
       dropList();
       return;
     }
 
-    setSourceHidden(grid, true);
+    grid.classList.toggle("cpp-files-source", true);
     ensureList(grid, files);
+  }
+
+  // cppProjectFilesView rides chrome.storage.sync, so the choice can be changed
+  // in another tab or on another machine. Reading it once at init and never
+  // listening would make it a synced key that doesn't sync — bookmarks-page.js
+  // watches its own preference the same way.
+  function onStorageChanged(changes, area) {
+    if (area !== "local" && area !== "sync") return;
+    if (!changes[VIEW_KEY]) return;
+    var next = changes[VIEW_KEY].newValue === "list" ? "list" : "grid";
+    if (next === view) return;
+    view = next;
+    render();
   }
 
   // Metadata (name/description/defaultEnabled) lives in features/registry.js.
@@ -347,6 +322,8 @@
 
     onInit: function (c) {
       ctx = c;
+      PF = CPP.projectFiles;
+      chrome.storage.onChanged.addListener(onStorageChanged);
       ctx.util.get([VIEW_KEY]).then(function (d) {
         view = d[VIEW_KEY] === "list" ? "list" : "grid";
         loaded = true;
@@ -359,6 +336,7 @@
     },
 
     onTeardown: function () {
+      chrome.storage.onChanged.removeListener(onStorageChanged);
       cleanup();
     }
   });

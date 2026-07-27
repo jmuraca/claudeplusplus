@@ -58,10 +58,12 @@
   box-shadow: 0 0 0 1px rgba(128, 128, 128, 0.35) inset;
 }
 
-/* Header icon button (sits between the pin and the "..." menu).
-   It borrows the neighbouring button's classes for sizing/hover, so we only
-   need to lay out its inner dot. */
-#cpp-color-btn {
+/* Buttons we inject into claude's own header rows. Each borrows a neighbouring
+   button's classes for sizing, hover and focus, so all that's left to do here
+   is lay out the icon box inside. Shared by the project-colour swatch and the
+   grid/list view switch. */
+#cpp-color-btn,
+.cpp-view-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -253,7 +255,8 @@
 }
 
 .cpp-modal-cancel,
-.cpp-modal-save {
+.cpp-modal-save,
+.cpp-confirm-go {
   padding: 6px 14px;
   border-radius: 8px;
   font-size: 13px;

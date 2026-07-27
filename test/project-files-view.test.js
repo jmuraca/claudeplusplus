@@ -21,6 +21,11 @@ const SOURCE = fs.readFileSync(
   "utf8"
 );
 
+const PROJECT_FILES = fs.readFileSync(
+  path.join(__dirname, "..", "src", "project-files.js"),
+  "utf8"
+);
+
 const PROJECT = "42028720-ea8b-49d9-8881-9a33822f6a71";
 const ALPHA_ID = "1ad752ce-36bd-4836-9015-f50d300c870b";
 
@@ -92,6 +97,22 @@ async function harness(opts) {
     el.addEventListener("click", () => log.clicked.push(el.id));
   });
 
+  // The feature watches chrome.storage so a view switch in another tab (or on
+  // another machine, via sync) reaches this one. The stub records the listener
+  // so a test can fire a change at it.
+  const listeners = [];
+  window.chrome = {
+    storage: {
+      onChanged: {
+        addListener: (fn) => listeners.push(fn),
+        removeListener: (fn) => {
+          const i = listeners.indexOf(fn);
+          if (i !== -1) listeners.splice(i, 1);
+        }
+      }
+    }
+  };
+
   window.CPP = {
     util: {
       currentProjectId: () => PROJECT,
@@ -119,6 +140,7 @@ async function harness(opts) {
 
   // Run the content script the way the manifest does: as a script in the page,
   // so its bare `window`/`document`/`CPP` resolve to this document's.
+  new window.Function(PROJECT_FILES).call(window);
   new window.Function(SOURCE).call(window);
   const feature = window.CPP.feature;
   feature.onInit(window.CPP);
@@ -138,7 +160,13 @@ async function harness(opts) {
   const cell = (i, sel) => rows()[i].querySelector(sel);
   const viewBtn = (mode) => document.querySelector(`.cpp-view-btn[data-cpp-view="${mode}"]`);
 
-  return { window, document, feature, log, settle, click, rows, cell, viewBtn };
+  // Fire a storage change the way another tab flipping the preference would.
+  const storageChange = (value, area) =>
+    listeners.slice().forEach((fn) =>
+      fn({ cppProjectFilesView: { newValue: value } }, area || "sync"));
+
+  return { window, document, feature, log, settle, click, rows, cell, viewBtn,
+           storageChange, listeners };
 }
 
 // Switch to list view.
@@ -284,4 +312,46 @@ test("nothing is added when the page has no file grid", async () => {
   h.document.getElementById("grid").remove();
   h.feature.onApply();
   assert.equal(h.document.querySelector(".cpp-view-toggle"), null, "the switch goes with it");
+});
+
+test("a view switch in another tab reaches this one", async () => {
+  // cppProjectFilesView rides chrome.storage.sync, so the choice can change in
+  // another tab or on another machine. Reading it once at init and never
+  // listening would make it a synced key that doesn't sync.
+  const h = await harness();
+  assert.equal(h.rows().length, 0, "starts in grid view");
+  h.storageChange("list");
+  assert.equal(h.rows().length, 2, "the list is drawn without a click here");
+  assert.equal(h.viewBtn("list").getAttribute("aria-pressed"), "true");
+  h.storageChange("grid");
+  assert.equal(h.document.querySelector(".cpp-files-list"), null);
+});
+
+test("an unrelated storage change is ignored", async () => {
+  const h = await harness();
+  h.listeners.slice().forEach((fn) =>
+    fn({ somethingElse: { newValue: "x" } }, "sync"));
+  assert.equal(h.document.querySelector(".cpp-files-list"), null);
+});
+
+test("teardown stops listening for storage changes", async () => {
+  const h = await listing();
+  h.feature.onTeardown();
+  assert.equal(h.listeners.length, 0, "the listener is removed, not left behind");
+});
+
+test("grid view doesn't read the tiles", async () => {
+  // onApply runs several times a second on a busy page and grid is the default,
+  // so a pass that won't draw a list must not build a descriptor per tile.
+  const h = await harness();
+  let reads = 0;
+  const real = h.window.CPP.projectFiles.tiles;
+  h.window.CPP.projectFiles.tiles = function () {
+    reads++;
+    return real.apply(this, arguments);
+  };
+  h.feature.onApply();
+  assert.equal(reads, 0, "no tile enumeration in grid view");
+  h.click(h.viewBtn("list"));
+  assert.ok(reads > 0, "but list view does read them");
 });

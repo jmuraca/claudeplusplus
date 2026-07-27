@@ -1,50 +1,24 @@
 /* Claude++ — "are you sure" before a project file is deleted
  *
- * The dialog hangs off <body>, outside React's tree, so a re-render of the
- * Context panel can't disturb it while it's open. Colours come from claude.ai's
- * own custom properties with fallbacks, so light/dark and any token retune
- * follow without a change here.
+ * The shell — backdrop, centred panel, title, the actions row and its Cancel
+ * button — is the shared .cpp-modal-* set in content.css, the same one the
+ * create-project dialog wears. Only what a *confirmation* adds over a plain
+ * modal lives here: room for file names, the ⚠️ block, the list of what's
+ * going, and a destructive button where that modal has a primary one.
  *
- * The z-index sits just above the asides popover layer (2147482991 in
- * scroll-nav's note) — this is a modal question, so nothing Claude++ draws
- * should ever sit over it. */
+ * The dialog hangs off <body>, outside React's tree, so a re-render of the
+ * Context panel can't disturb it while it's open. */
 
-.cpp-confirm-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  background: rgb(0 0 0 / 0.4);
-}
-
+/* Wider than .cpp-modal's 340px: this one has file names in it, and claude's
+   run long. */
 .cpp-confirm {
-  width: 100%;
-  max-width: 26rem;
-  padding: 1.25rem;
-  border: 1px solid hsl(var(--border-300, 0 0% 85%));
-  border-radius: 0.75rem;
-  background: hsl(var(--bg-100, 0 0% 100%));
-  box-shadow: 0 12px 32px rgb(0 0 0 / 0.25);
-  font-family: inherit;
+  width: 26rem;
 }
 
-.cpp-confirm-title {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-  font-weight: 600;
-  color: hsl(var(--text-100, 0 0% 10%));
-}
-
-/* A long file name is named in here, so it has to be allowed to wrap rather
-   than push the dialog wider than its max-width. */
 .cpp-confirm-body {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: 13px;
   line-height: 1.5;
-  color: hsl(var(--text-300, 0 0% 35%));
   overflow-wrap: anywhere;
 }
 
@@ -54,7 +28,7 @@
    12px above it is the same gap .cpp-del-guard opens up over there, which is
    the blank line that sets the warning apart from the question. */
 .cpp-confirm .cpp-del-warning {
-  margin: 12px 0 1.25rem;
+  margin: 12px 0 0;
   overflow-wrap: anywhere;
 }
 
@@ -84,43 +58,25 @@
   margin: 0.125rem 0;
 }
 
-.cpp-confirm-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-}
-
-.cpp-confirm-actions button {
-  padding: 0.375rem 0.875rem;
-  border-radius: 0.5rem;
-  font: inherit;
-  font-size: 0.875rem;
-  cursor: pointer;
-}
-
-.cpp-confirm-actions button:focus-visible {
-  outline: 2px solid hsl(var(--accent-100, 15 63% 60%));
-  outline-offset: 2px;
-}
-
-.cpp-confirm-cancel {
-  border: 1px solid hsl(var(--border-300, 0 0% 85%));
-  background: transparent;
-  color: hsl(var(--text-200, 0 0% 20%));
-}
-
-.cpp-confirm-cancel:hover {
-  background: hsl(var(--bg-200, 0 0% 96%));
-}
-
-/* The destructive action is the one that has to look destructive — it's the
-   button the dialog exists to slow down, and it is not the one holding focus. */
+/* The destructive action, where .cpp-modal-save is a primary one. Sizing and
+   shape come from the shared button rule in content.css; only the colour is
+   set here. It is deliberately not the button holding focus. */
 .cpp-confirm-go {
-  border: 1px solid transparent;
-  background: hsl(var(--danger-100, 0 65% 51%));
+  background: #dc2626;
+  border-color: #dc2626;
   color: #fff;
 }
 
 .cpp-confirm-go:hover {
-  background: hsl(var(--danger-000, 0 65% 44%));
+  filter: brightness(1.08);
+}
+
+/* The confirmation is reachable by keyboard throughout — it traps Tab between
+   the two buttons — so the focus ring has to be visible on them, which the
+   shared modal (driven from a text input) never needed. */
+.cpp-confirm-actions button:focus-visible,
+.cpp-modal-actions .cpp-confirm-go:focus-visible,
+.cpp-modal-actions .cpp-modal-cancel:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
 }

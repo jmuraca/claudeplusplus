@@ -35,6 +35,7 @@
         "src/storage-sync.js",
         "src/core.js",
         "src/anchor.js",
+        "src/project-files.js",
         "src/features/project-colors.js",
         "src/features/create-project.js",
         "src/features/delete-guard.js",

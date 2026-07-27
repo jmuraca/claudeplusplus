@@ -90,6 +90,13 @@ This asks first.
   **Delete** has no such landmark, so it's matched on its label, but only while files are
   actually selected — the state that button exists for. That pairing is what keeps the label
   test from firing on unrelated buttons.
+- **A ticked file is not a checked checkbox.** claude keeps the selection in React state and
+  styles the box from it directly: a tile input carries no `checked` even while the tile is
+  plainly ticked, and React re-creates that input often enough that reading the property
+  returns "nothing selected" on a freshly rendered tile. So the drawn checkmark is the
+  fallback signal, and the selection count is *also* read off claude's own
+  *"Delete N selected items"* label — two independent readings, because either can come up
+  short, and failing to guard is the costlier mistake.
 - The row **×** in list view is deliberately skipped: it deletes nothing itself, it forwards
   to the tile's ×, which *is* guarded — so the two views share one confirmation and can't
   double-prompt.

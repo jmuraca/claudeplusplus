@@ -30,13 +30,17 @@ const PAGE = `
     </div>
   </div>
   <div class="flex flex-col mb-1">
-    <div id="toolbar"></div>
-    <ul class="grid gap-3 mt-3" id="grid">
+    <div class="ml-1 -mr-2.5" id="toolbar"></div>
+    <ul class="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 mt-3" id="grid">
       <div class="group/thumbnail relative">
         <div data-testid="alpha.pdf">
           <button id="open-0"><img alt="alpha.pdf" src="/api/o/files/f0/thumbnail"></button>
-          <div class="absolute bottom-2">
-            <label><input id="check-0" class="sr-only peer" type="checkbox"></label>
+          <div class="absolute bottom-2 left-0 right-0 px-2.5">
+            <label class="relative select-none">
+              <input id="check-0" class="sr-only peer" type="checkbox">
+              <div class="bg-bg-000 border-border-200"></div>
+              <span class="leading-none sr-only">Select: alpha.pdf</span>
+            </label>
           </div>
         </div>
         <button id="remove-0" aria-label="Remove alpha.pdf"></button>
@@ -44,8 +48,12 @@ const PAGE = `
       <div class="group/thumbnail relative">
         <div data-testid="notes.txt">
           <button id="open-1"></button>
-          <div class="absolute bottom-2">
-            <label><input id="check-1" class="sr-only peer" type="checkbox"></label>
+          <div class="absolute bottom-2 left-0 right-0 px-2.5">
+            <label class="relative select-none">
+              <input id="check-1" class="sr-only peer" type="checkbox">
+              <div class="bg-bg-000 border-border-200"></div>
+              <span class="leading-none sr-only">Select: notes.txt</span>
+            </label>
           </div>
         </div>
         <button id="remove-1" aria-label="Remove notes.txt"></button>
@@ -102,12 +110,29 @@ function harness() {
   const body = () => document.querySelector(".cpp-confirm-body").textContent;
   const titleText = () => document.querySelector(".cpp-confirm-title").textContent;
 
-  // Put a selection toolbar in place, the way claude does once files are ticked.
-  const selectFiles = (...ids) => {
-    ids.forEach((id) => { $(id).checked = true; });
+  // Tick files the way claude really does: it keeps the selection in its own
+  // state, restyles the box and draws the checkmark, and leaves the input's
+  // `checked` property alone — which is exactly the case that used to slip past
+  // the guard. `native` opts into also setting the property, the way a click
+  // the input survives would.
+  const selectFiles = (ids, native) => {
+    ids.forEach((id) => {
+      const box = $(id);
+      if (native) box.checked = true;
+      const label = box.closest("label");
+      label.querySelector("div").className = "bg-accent-100 border-accent-100";
+      label.querySelector("div").innerHTML =
+        '<svg class="text-oncolor-100" viewBox="0 0 12 12"><path d="M2 6.5L4.5 9L10.5 3"></path></svg>';
+    });
     $("toolbar").innerHTML =
-      '<button id="bulk-delete" aria-label="Delete"></button>' +
-      '<button id="bulk-cancel" aria-label="Cancel"></button>';
+      '<div class="group/menu flex items-center">' +
+      '<div class="font-base text-text-400 ml-3"><span class="tabular-nums">' +
+      ids.length + '</span> selected</div>' +
+      '<div class="w-fit" data-state="closed"><button id="bulk-delete" type="button" ' +
+      'aria-label="Delete ' + ids.length + ' selected item' + (ids.length === 1 ? '' : 's') +
+      '"><svg viewBox="0 0 20 20"><path d="M11 1.5"></path></svg></button></div>' +
+      '<div class="w-fit" data-state="closed"><button id="bulk-cancel" type="button" ' +
+      'aria-label="Cancel"></button></div></div>';
     $("toolbar")
       .querySelectorAll("button")
       .forEach((b) => b.addEventListener("click", () => reached.push("bubbled:" + b.id)));
@@ -158,7 +183,7 @@ test("Cancel holds focus, so a stray Enter is the harmless answer", () => {
 
 test("a bulk delete is stopped and names the whole selection", () => {
   const h = harness();
-  h.selectFiles("check-0", "check-1");
+  h.selectFiles(["check-0", "check-1"]);
   h.click(h.$("bulk-delete"));
   assert.ok(h.dialog());
   assert.deepEqual(h.reached, []);
@@ -169,7 +194,7 @@ test("a bulk delete is stopped and names the whole selection", () => {
 
 test("confirming a bulk delete re-issues that one click", () => {
   const h = harness();
-  h.selectFiles("check-0", "check-1");
+  h.selectFiles(["check-0", "check-1"]);
   h.click(h.$("bulk-delete"));
   h.click(h.document.querySelector(".cpp-confirm-go"));
   // The toolbar's own handler first (it's on the button), then the document's.
@@ -177,12 +202,38 @@ test("confirming a bulk delete re-issues that one click", () => {
   assert.equal(h.dialog(), null);
 });
 
+test("a bulk delete is guarded even when the tiles look unchecked", () => {
+  // The regression this feature shipped with. claude leaves the tile input's
+  // `checked` property alone and draws the tick from its own state, so reading
+  // the property was returning "nothing is selected" and the first bulk delete
+  // of a session went straight through unguarded.
+  const h = harness();
+  h.selectFiles(["check-0", "check-1"]);
+  assert.equal(h.$("check-0").checked, false, "the fixture reproduces that state");
+  h.click(h.$("bulk-delete"));
+  assert.ok(h.dialog(), "and the delete is still stopped");
+  assert.deepEqual(h.reached, []);
+});
+
+test("the count is taken from claude's own label when no tile can be read", () => {
+  const h = harness();
+  h.selectFiles(["check-0", "check-1"]);
+  // A pass where the tiles can't be matched up at all — the button still says
+  // how many, so the dialog is still accurate about what's at stake.
+  h.$("grid").remove();
+  h.click(h.$("bulk-delete"));
+  assert.equal(h.titleText(), "Delete 2 files?");
+  assert.match(h.body(), /2 selected files/);
+});
+
 test("a delete-labelled button with nothing selected is left alone", () => {
   const h = harness();
-  // The toolbar only exists while files are ticked; untick them and the same
-  // button must stop being treated as a delete.
-  h.selectFiles("check-0");
+  // The toolbar only exists while files are ticked; clear the selection and the
+  // same button must stop being treated as a delete.
+  h.selectFiles(["check-0"], true);
   h.$("check-0").checked = false;
+  h.$("check-0").closest("label").querySelector("svg").remove();
+  h.$("bulk-delete").setAttribute("aria-label", "Delete");
   h.click(h.$("bulk-delete"));
   assert.equal(h.dialog(), null);
   assert.deepEqual(h.reached, ["bubbled:bulk-delete", "bulk-delete"]);
@@ -200,7 +251,7 @@ test("opening a file, ticking it, and the header buttons all pass through", () =
 
 test("a delete elsewhere on the page is none of our business", () => {
   const h = harness();
-  h.selectFiles("check-0");
+  h.selectFiles(["check-0"]);
   h.click(h.$("outsider"));
   assert.equal(h.dialog(), null, "outside the Context panel, even while files are selected");
   assert.deepEqual(h.reached, ["outsider"]);

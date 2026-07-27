@@ -83,14 +83,23 @@
     );
   }
 
+  // Is this tile ticked? Deliberately not `input.checked` alone. claude keeps
+  // the selection in React state and styles the box from it directly — the tile
+  // inputs carry no `checked` even while plainly ticked — and React re-creates
+  // that input often enough that the property reads false on a freshly rendered
+  // tile. The drawn checkmark is what actually says "selected", so it's the
+  // fallback. Trusting the property alone is what let the first bulk delete of
+  // a session through unguarded.
+  function isSelected(item) {
+    var box = item.querySelector('input[type="checkbox"]');
+    if (!box) return false;
+    if (box.checked) return true;
+    var label = box.closest("label") || box.parentElement;
+    return !!(label && label.querySelector("svg"));
+  }
+
   function selectedNames(grid) {
-    return items(grid)
-      .filter(function (item) {
-        var box = item.querySelector('input[type="checkbox"]');
-        return !!(box && box.checked);
-      })
-      .map(nameOf)
-      .filter(Boolean);
+    return items(grid).filter(isSelected).map(nameOf).filter(Boolean);
   }
 
   // ---------- classifying a click ----------
@@ -126,33 +135,51 @@
   // two cheap checks and out.
   function classify(el) {
     var grid = findGrid();
-    if (!grid) return null;
-    var panel = panelRoot();
-    if (!panel || !panel.contains(el)) return null;
 
     var item = el.closest(ITEM_SEL);
     if (item) {
+      if (!grid || !grid.contains(item)) return null;
       // Only the tile's own × — a direct child of the wrapper. The thumbnail's
       // open button and the select checkbox both sit deeper in.
       if (el.parentElement !== item) return null;
       var name = nameOf(item);
       if (!name) return null;
       return {
+        count: 1,
         names: [name],
         find: function () { return findTileRemove(name); }
       };
     }
 
-    if (!DELETE_RE.test(labelOf(el))) return null;
+    var label = labelOf(el);
+    if (!DELETE_RE.test(label)) return null;
     // A bulk delete only means anything when files are selected; requiring that
-    // is what stops the label test from firing on unrelated buttons.
-    var names = selectedNames(grid);
-    if (!names.length) return null;
-    return { names: names, find: findBulkButton };
+    // is what stops the label test from firing on unrelated buttons. Two
+    // independent readings of "how many", because either can come up short:
+    // the tiles, and claude's own "Delete N selected item(s)" on the button.
+    var names = grid ? selectedNames(grid) : [];
+    var m = /(\d+)\s+selected/i.exec(label);
+    var count = names.length || (m ? parseInt(m[1], 10) : 0);
+    if (!count) return null;
+    // Being inside the Context panel is what keeps a "Delete" elsewhere on the
+    // page out of this. When the panel can't be located at all, a label that
+    // counts the selection itself ("Delete 2 selected items") is specific
+    // enough to stand on its own — and not guarding is the costlier mistake.
+    var panel = panelRoot();
+    if (panel ? !panel.contains(el) : !m) return null;
+    return {
+      count: count,
+      names: names,
+      // The control the user actually clicked, so confirming can never land on
+      // some other delete; re-found only if React has since replaced it.
+      find: function () {
+        return document.contains(el) ? el : findBulkButton();
+      }
+    };
   }
 
   function onClickCapture(e) {
-    if (bypass || dialog) return;
+    if (bypass) return;
     var el = e.target && e.target.closest
       ? e.target.closest('button, [role="button"]')
       : null;
@@ -164,22 +191,30 @@
     if (!target) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    open(target);
+    // Swallowed whether or not a dialog is already up: bailing out early on an
+    // open dialog would let a second click through unguarded.
+    if (!dialog) open(target);
   }
 
   // ---------- the confirmation ----------
 
-  function describe(names) {
-    if (names.length === 1) {
-      return "“" + names[0] + "” will be removed from this project.";
+  // Names them when they're known, counts them when they aren't — the count is
+  // read off claude's own button label, so it's right even on a pass where the
+  // tiles couldn't be matched up.
+  function describe(target) {
+    var names = target.names;
+    var tail = " will be removed from this project.";
+    if (names.length !== target.count) {
+      return target.count + " selected " + plural(target.count) + tail;
     }
+    if (names.length === 1) return "“" + names[0] + "”" + tail;
     var shown = names.slice(0, 5);
     var rest = names.length - shown.length;
-    return (
-      shown.join(", ") +
-      (rest ? ", and " + rest + " more" : "") +
-      " will be removed from this project."
-    );
+    return shown.join(", ") + (rest ? ", and " + rest + " more" : "") + tail;
+  }
+
+  function plural(n) {
+    return n === 1 ? "file" : "files";
   }
 
   function close() {
@@ -217,9 +252,9 @@
     title.className = "cpp-confirm-title";
     title.id = "cpp-confirm-title";
     title.textContent =
-      target.names.length === 1
+      target.count === 1
         ? "Delete this file?"
-        : "Delete " + target.names.length + " files?";
+        : "Delete " + target.count + " files?";
     box.setAttribute("aria-labelledby", title.id);
 
     var body = document.createElement("p");
@@ -227,7 +262,7 @@
     body.id = "cpp-confirm-body";
     // Built from text, not innerHTML, so a file name carrying markup can't
     // inject anything.
-    body.textContent = describe(target.names) + " This can't be undone.";
+    body.textContent = describe(target) + " This can't be undone.";
     box.setAttribute("aria-describedby", body.id);
 
     var actions = document.createElement("div");

@@ -62,6 +62,19 @@
     return m ? m[1] : "";
   }
 
+  // Is this tile ticked? Deliberately not `input.checked` alone. claude keeps
+  // the selection in React state and styles the checkbox from it directly — the
+  // tile inputs carry no `checked` even while plainly ticked — and React
+  // re-creates that input often enough that the property reads false on a
+  // freshly rendered tile. The drawn checkmark is what actually says
+  // "selected", so it's the fallback.
+  function isSelected(box) {
+    if (!box) return false;
+    if (box.checked) return true;
+    var label = box.closest("label") || box.parentElement;
+    return !!(label && label.querySelector("svg"));
+  }
+
   // One descriptor per tile, holding the live controls a row forwards to.
   // Re-read on every pass: React replaces these nodes freely, so nothing here
   // is ever cached across renders.
@@ -278,8 +291,7 @@
     var rows = list.children;
     for (var i = 0; i < rows.length && i < files.length; i++) {
       var box = rows[i].querySelector(".cpp-file-check");
-      var real = files[i].check;
-      if (box) box.checked = !!(real && real.checked);
+      if (box) box.checked = isSelected(files[i].check);
     }
     return list;
   }

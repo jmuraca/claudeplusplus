@@ -110,6 +110,9 @@ function harness() {
   const body = () => document.querySelector(".cpp-confirm-body").textContent;
   // The ⚠️ line, sharing the project-delete dialog's own warning class.
   const warning = () => document.querySelector(".cpp-confirm .cpp-del-warning").textContent;
+  const lead = () => document.querySelector(".cpp-confirm-lead").textContent;
+  const listed = () =>
+    Array.from(document.querySelectorAll(".cpp-confirm-files li"), (li) => li.textContent);
   const titleText = () => document.querySelector(".cpp-confirm-title").textContent;
 
   // Tick files the way claude really does: it keeps the selection in its own
@@ -140,7 +143,7 @@ function harness() {
       .forEach((b) => b.addEventListener("click", () => reached.push("bubbled:" + b.id)));
   };
 
-  return { window, document, feature, reached, $, click, press, dialog, body, warning, titleText, selectFiles };
+  return { window, document, feature, reached, $, click, press, dialog, body, warning, lead, listed, titleText, selectFiles };
 }
 
 test("the tile × is stopped before it deletes anything", () => {
@@ -151,10 +154,15 @@ test("the tile × is stopped before it deletes anything", () => {
   // Same shape as the project-delete dialog: heading naming the target, the
   // "are you sure" line, then the ⚠️ warning.
   assert.equal(h.titleText(), "Delete file: alpha.pdf");
-  assert.equal(h.body(), "Are you sure you want to delete alpha.pdf?");
-  assert.match(h.warning(), /^⚠️ /, "the warning leads with the emoji");
-  assert.match(h.warning(), /permanently remove alpha\.pdf from this project/);
-  assert.match(h.warning(), /can't be undone/);
+  assert.equal(h.body(), "Are you sure you want to delete alpha.pdf from this project?");
+  assert.match(h.lead(), /^⚠️ /, "the warning leads with the emoji");
+  assert.equal(h.lead(), "⚠️ This will permanently remove alpha.pdf.");
+  assert.deepEqual(h.listed(), [], "one file is named inline, not bulleted");
+  assert.equal(
+    h.document.querySelector(".cpp-confirm-final").textContent,
+    "This can't be undone.",
+    "set apart on its own line"
+  );
   assert.equal(
     h.document.querySelector(".cpp-confirm .cpp-del-warning strong").textContent,
     "alpha.pdf",
@@ -200,9 +208,10 @@ test("a bulk delete is stopped and names the whole selection", () => {
   assert.ok(h.dialog());
   assert.deepEqual(h.reached, []);
   assert.equal(h.titleText(), "Delete 2 files");
-  assert.equal(h.body(), "Are you sure you want to delete these 2 files?");
-  assert.match(h.warning(), /^⚠️ /);
-  assert.match(h.warning(), /alpha\.pdf, notes\.txt/);
+  assert.equal(h.body(), "Are you sure you want to delete these 2 files from this project?");
+  assert.equal(h.lead(), "⚠️ This will permanently remove");
+  assert.deepEqual(h.listed(), ["alpha.pdf", "notes.txt"], "one bullet per file");
+  assert.match(h.warning(), /can't be undone/);
 });
 
 test("confirming a bulk delete re-issues that one click", () => {
@@ -236,7 +245,8 @@ test("the count is taken from claude's own label when no tile can be read", () =
   h.$("grid").remove();
   h.click(h.$("bulk-delete"));
   assert.equal(h.titleText(), "Delete 2 files");
-  assert.match(h.warning(), /permanently remove 2 selected files/);
+  assert.equal(h.lead(), "⚠️ This will permanently remove 2 selected files.");
+  assert.deepEqual(h.listed(), [], "nothing to bullet when the names are unknown");
 });
 
 test("a delete-labelled button with nothing selected is left alone", () => {

@@ -220,21 +220,58 @@
   }
 
   function askFor(target) {
+    var tail = " from this project?";
     if (target.count !== 1) {
-      return "Are you sure you want to delete these " + target.count + " files?";
+      return "Are you sure you want to delete these " + target.count + " files" + tail;
     }
     return named(target)
-      ? "Are you sure you want to delete " + target.names[0] + "?"
-      : "Are you sure you want to delete this file?";
+      ? "Are you sure you want to delete " + target.names[0] + tail
+      : "Are you sure you want to delete this file" + tail;
   }
 
-  // What the warning line bolds: the names when they're known, the count when
-  // they aren't.
-  function subjectFor(target) {
-    if (!named(target)) return target.count + " selected " + plural(target.count);
-    var shown = target.names.slice(0, 5);
-    var rest = target.names.length - shown.length;
-    return shown.join(", ") + (rest ? ", and " + rest + " more" : "");
+  // The warning block: the ⚠️ lead, what's going, then "This can't be undone."
+  // set apart on its own line.
+  //
+  // Several files are listed one per line rather than run together in a
+  // sentence — claude's file names are long and near-identical often enough
+  // (…EMRS2026FAQs 1.pdf beside …EMRS2026ApplicationGuidelines 1.pdf) that a
+  // comma-separated run is unreadable at exactly the moment it matters most.
+  // The list scrolls past a few items, so a large selection can be named in
+  // full without the dialog growing off-screen.
+  function buildWarning(target) {
+    var box = document.createElement("div");
+    box.className = "cpp-del-warning";
+
+    var lead = document.createElement("p");
+    lead.className = "cpp-confirm-lead";
+    box.appendChild(lead);
+
+    if (named(target) && target.count > 1) {
+      lead.textContent = "⚠️ This will permanently remove";
+      var list = document.createElement("ul");
+      list.className = "cpp-confirm-files";
+      target.names.forEach(function (name) {
+        var li = document.createElement("li");
+        // Text, not innerHTML — a file name carrying markup can't inject
+        // anything this way.
+        li.textContent = name;
+        list.appendChild(li);
+      });
+      box.appendChild(list);
+    } else {
+      var subject = document.createElement("strong");
+      subject.textContent = named(target)
+        ? target.names[0]
+        : target.count + " selected " + plural(target.count);
+      lead.append("⚠️ This will permanently remove ", subject, ".");
+    }
+
+    var final = document.createElement("p");
+    final.className = "cpp-confirm-final";
+    final.textContent = "This can't be undone.";
+    box.appendChild(final);
+
+    return box;
   }
 
   function close() {
@@ -280,18 +317,9 @@
     body.textContent = askFor(target);
     box.setAttribute("aria-describedby", body.id);
 
-    // The same class the project-delete warning wears, so both dialogs pick up
-    // one definition and can't drift apart. Built from nodes rather than
-    // innerHTML, so a file name carrying markup can't inject anything.
-    var warning = document.createElement("p");
-    warning.className = "cpp-del-warning";
-    var subject = document.createElement("strong");
-    subject.textContent = subjectFor(target);
-    warning.append(
-      "⚠️ This will permanently remove ",
-      subject,
-      " from this project. This can't be undone."
-    );
+    // Wears the same class the project-delete warning does, so both dialogs
+    // pick up one definition of the amber notice and can't drift apart.
+    var warning = buildWarning(target);
 
     var actions = document.createElement("div");
     actions.className = "cpp-confirm-actions";

@@ -58,6 +58,32 @@
   overflow-wrap: anywhere;
 }
 
+.cpp-confirm-lead,
+.cpp-confirm-final {
+  margin: 0;
+}
+
+/* The blank line that sets "This can't be undone." apart from what's going. */
+.cpp-confirm-final {
+  margin-top: 0.75rem;
+}
+
+/* One file per line. claude's file names are long and near-identical often
+   enough that a comma-separated run is unreadable at exactly the moment it
+   matters most. Past a few items the list scrolls rather than growing the
+   dialog off-screen, so every name can be shown without truncating the list. */
+.cpp-confirm-files {
+  margin: 0.375rem 0 0;
+  padding-left: 1.25rem;
+  max-height: 8.5rem;
+  overflow-y: auto;
+  list-style: disc;
+}
+
+.cpp-confirm-files li {
+  margin: 0.125rem 0;
+}
+
 .cpp-confirm-actions {
   display: flex;
   justify-content: flex-end;

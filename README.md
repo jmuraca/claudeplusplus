@@ -70,6 +70,30 @@ Search and Add files.
   rather than `display:none` so every tile keeps a truthful layout box — otherwise anything
   claude anchors to a thumbnail would be positioned against the page's top-left corner.
 
+### 🗑️ Delete file confirmation
+Removing a file from a project's **Context** panel is instant and unprompted: the **×** sits
+under the pointer the moment you hover a thumbnail, and the bulk **Delete** that appears once
+files are ticked takes the whole selection in one click. Re-uploading is the only way back.
+This asks first.
+
+- Covers a **single file** and a **multi-select**, in either grid or list view, naming what's
+  about to go — one file by name, several by name with an "and N more" tail.
+- **Cancel** holds focus, so a stray Enter on a dialog you didn't mean to open is the harmless
+  answer. Escape and a click on the backdrop also cancel; Tab is trapped between the two
+  buttons.
+- The click is caught in the **capture phase**, before React's own handler, so the delete is
+  stopped rather than confirmed after the fact. On confirm, the very same control is found
+  again and clicked with the guard standing down — the delete goes out through claude's own
+  code path, never ours, so a cancel leaves the page untouched.
+- The per-file **×** is recognised structurally (it's the button that is a direct child of a
+  thumbnail wrapper — the tile's own open button and its checkbox sit deeper in). The bulk
+  **Delete** has no such landmark, so it's matched on its label, but only while files are
+  actually selected — the state that button exists for. That pairing is what keeps the label
+  test from firing on unrelated buttons.
+- The row **×** in list view is deliberately skipped: it deletes nothing itself, it forwards
+  to the tile's ×, which *is* guarded — so the two views share one confirmation and can't
+  double-prompt.
+
 ### ⏳ Thinking status in tab title
 From the browser's tab strip every claude.ai tab looks identical, so you can't tell the
 one that's mid-response from the one that answered a while ago and is waiting on you.

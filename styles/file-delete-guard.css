@@ -1,0 +1,90 @@
+/* Claude++ — "are you sure" before a project file is deleted
+ *
+ * The dialog hangs off <body>, outside React's tree, so a re-render of the
+ * Context panel can't disturb it while it's open. Colours come from claude.ai's
+ * own custom properties with fallbacks, so light/dark and any token retune
+ * follow without a change here.
+ *
+ * The z-index sits just above the asides popover layer (2147482991 in
+ * scroll-nav's note) — this is a modal question, so nothing Claude++ draws
+ * should ever sit over it. */
+
+.cpp-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 0.4);
+}
+
+.cpp-confirm {
+  width: 100%;
+  max-width: 26rem;
+  padding: 1.25rem;
+  border: 1px solid hsl(var(--border-300, 0 0% 85%));
+  border-radius: 0.75rem;
+  background: hsl(var(--bg-100, 0 0% 100%));
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.25);
+  font-family: inherit;
+}
+
+.cpp-confirm-title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: hsl(var(--text-100, 0 0% 10%));
+}
+
+/* A long file name is quoted in here, so it has to be allowed to wrap rather
+   than push the dialog wider than its max-width. */
+.cpp-confirm-body {
+  margin: 0 0 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: hsl(var(--text-300, 0 0% 35%));
+  overflow-wrap: anywhere;
+}
+
+.cpp-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.cpp-confirm-actions button {
+  padding: 0.375rem 0.875rem;
+  border-radius: 0.5rem;
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.cpp-confirm-actions button:focus-visible {
+  outline: 2px solid hsl(var(--accent-100, 15 63% 60%));
+  outline-offset: 2px;
+}
+
+.cpp-confirm-cancel {
+  border: 1px solid hsl(var(--border-300, 0 0% 85%));
+  background: transparent;
+  color: hsl(var(--text-200, 0 0% 20%));
+}
+
+.cpp-confirm-cancel:hover {
+  background: hsl(var(--bg-200, 0 0% 96%));
+}
+
+/* The destructive action is the one that has to look destructive — it's the
+   button the dialog exists to slow down, and it is not the one holding focus. */
+.cpp-confirm-go {
+  border: 1px solid transparent;
+  background: hsl(var(--danger-100, 0 65% 51%));
+  color: #fff;
+}
+
+.cpp-confirm-go:hover {
+  background: hsl(var(--danger-000, 0 65% 44%));
+}

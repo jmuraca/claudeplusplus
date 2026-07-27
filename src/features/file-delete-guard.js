@@ -1,0 +1,300 @@
+// Feature: Delete file confirmation
+//
+// Removing a file from a project's Context panel is instant and unprompted: the
+// × on a thumbnail sits under the pointer the moment you hover a tile, and the
+// bulk Delete that appears once files are selected takes the whole selection in
+// one click. Either way the file is gone, and re-uploading it is the only way
+// back. This puts an "are you sure" in front of both.
+//
+// HOW IT INTERCEPTS. A capture-phase click listener on the document, which runs
+// before React's own root listener, so a delete is stopped dead
+// (preventDefault + stopImmediatePropagation) rather than confirmed after the
+// fact. Once the user confirms, the very same control is found again and
+// clicked with the guard standing down — so the delete goes through claude's
+// own code path, not ours. Nothing is deleted by us, and a cancel leaves the
+// page exactly as it was.
+//
+// WHICH CLICKS COUNT. The per-file × is identified structurally: it's the
+// button that is a direct child of a thumbnail wrapper (the tile's own open
+// button and its checkbox are nested deeper, so neither matches). The bulk
+// Delete has no such landmark, so it's matched on its label — but only when
+// something is actually selected, which is the state that button exists for.
+// That pairing is what keeps the label test from firing on unrelated chrome.
+//
+// The row × in Claude++'s own list view is deliberately skipped: it doesn't
+// delete anything itself, it forwards to the tile's × — which this guards. So
+// list and grid share one confirmation and can't double-prompt.
+(function () {
+  "use strict";
+
+  var ctx = null;
+
+  var ITEM_SEL = '[class~="group/thumbnail"]';
+  var DELETE_RE = /\b(delete|remove)\b/i;
+
+  var bypass = false; // set while re-issuing a click the user has confirmed
+  var dialog = null;
+  var lastFocus = null;
+
+  // ---------- locating the panel ----------
+
+  function findGrid() {
+    var item = document.querySelector("ul > " + ITEM_SEL);
+    return item ? item.parentElement : null;
+  }
+
+  function findHeaderBar() {
+    var add = document.querySelector(
+      '[data-testid="project-doc-uploader-dropdown-trigger"]'
+    );
+    return add ? add.parentElement : null;
+  }
+
+  // The Context panel: the nearest ancestor holding both the file grid and the
+  // header's button row. Derived from those two landmarks rather than matched
+  // on a class, so it survives a restyle — and it's what scopes the label test
+  // below to this panel instead of the whole page.
+  function panelRoot() {
+    var grid = findGrid();
+    if (!grid) return null;
+    var bar = findHeaderBar();
+    if (!bar) return grid.parentElement;
+    var el = grid;
+    while (el && !el.contains(bar)) el = el.parentElement;
+    return el || grid.parentElement;
+  }
+
+  function labelOf(el) {
+    return (
+      (el.getAttribute("aria-label") || "") + " " +
+      (el.getAttribute("title") || "") + " " +
+      (ctx ? ctx.util.plainText(el) : el.textContent || "")
+    );
+  }
+
+  function nameOf(item) {
+    var tile = item.querySelector("[data-testid]");
+    return (tile && tile.getAttribute("data-testid")) || "";
+  }
+
+  function items(grid) {
+    return Array.prototype.slice.call(
+      grid.querySelectorAll(":scope > " + ITEM_SEL)
+    );
+  }
+
+  function selectedNames(grid) {
+    return items(grid)
+      .filter(function (item) {
+        var box = item.querySelector('input[type="checkbox"]');
+        return !!(box && box.checked);
+      })
+      .map(nameOf)
+      .filter(Boolean);
+  }
+
+  // ---------- classifying a click ----------
+
+  // The bulk Delete: a labelled control inside the panel but outside the grid.
+  // Re-found rather than remembered, since React is free to re-render the
+  // toolbar while the confirmation is open.
+  function findBulkButton() {
+    var panel = panelRoot();
+    var grid = findGrid();
+    if (!panel || !grid) return null;
+    var els = panel.querySelectorAll('button, [role="button"]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      if (grid.contains(el) || el.closest(".cpp-files-list, .cpp-confirm")) continue;
+      if (DELETE_RE.test(labelOf(el))) return el;
+    }
+    return null;
+  }
+
+  function findTileRemove(name) {
+    var grid = findGrid();
+    if (!grid) return null;
+    var list = items(grid);
+    for (var i = 0; i < list.length; i++) {
+      if (nameOf(list[i]) === name) return list[i].querySelector(":scope > button");
+    }
+    return null;
+  }
+
+  // What, if anything, this click would delete. Returns null for every click
+  // that isn't a delete, which is nearly all of them — so the common path is
+  // two cheap checks and out.
+  function classify(el) {
+    var grid = findGrid();
+    if (!grid) return null;
+    var panel = panelRoot();
+    if (!panel || !panel.contains(el)) return null;
+
+    var item = el.closest(ITEM_SEL);
+    if (item) {
+      // Only the tile's own × — a direct child of the wrapper. The thumbnail's
+      // open button and the select checkbox both sit deeper in.
+      if (el.parentElement !== item) return null;
+      var name = nameOf(item);
+      if (!name) return null;
+      return {
+        names: [name],
+        find: function () { return findTileRemove(name); }
+      };
+    }
+
+    if (!DELETE_RE.test(labelOf(el))) return null;
+    // A bulk delete only means anything when files are selected; requiring that
+    // is what stops the label test from firing on unrelated buttons.
+    var names = selectedNames(grid);
+    if (!names.length) return null;
+    return { names: names, find: findBulkButton };
+  }
+
+  function onClickCapture(e) {
+    if (bypass || dialog) return;
+    var el = e.target && e.target.closest
+      ? e.target.closest('button, [role="button"]')
+      : null;
+    if (!el) return;
+    // Our own list's × forwards to the tile's ×, which is the click that gets
+    // guarded — intercepting both would prompt twice.
+    if (el.closest(".cpp-files-list, .cpp-confirm")) return;
+    var target = classify(el);
+    if (!target) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    open(target);
+  }
+
+  // ---------- the confirmation ----------
+
+  function describe(names) {
+    if (names.length === 1) {
+      return "“" + names[0] + "” will be removed from this project.";
+    }
+    var shown = names.slice(0, 5);
+    var rest = names.length - shown.length;
+    return (
+      shown.join(", ") +
+      (rest ? ", and " + rest + " more" : "") +
+      " will be removed from this project."
+    );
+  }
+
+  function close() {
+    if (!dialog) return;
+    dialog.remove();
+    dialog = null;
+    if (lastFocus && document.contains(lastFocus)) {
+      try { lastFocus.focus(); } catch (e) {}
+    }
+    lastFocus = null;
+  }
+
+  function confirmed(target) {
+    var btn = target.find();
+    close();
+    if (!btn) return;
+    // Through claude's own control, with the guard standing down — so the
+    // delete follows exactly the path it would have without us.
+    bypass = true;
+    try { btn.click(); } finally { bypass = false; }
+  }
+
+  function open(target) {
+    lastFocus = document.activeElement;
+
+    var back = document.createElement("div");
+    back.className = "cpp-confirm-backdrop";
+
+    var box = document.createElement("div");
+    box.className = "cpp-confirm";
+    box.setAttribute("role", "alertdialog");
+    box.setAttribute("aria-modal", "true");
+
+    var title = document.createElement("h2");
+    title.className = "cpp-confirm-title";
+    title.id = "cpp-confirm-title";
+    title.textContent =
+      target.names.length === 1
+        ? "Delete this file?"
+        : "Delete " + target.names.length + " files?";
+    box.setAttribute("aria-labelledby", title.id);
+
+    var body = document.createElement("p");
+    body.className = "cpp-confirm-body";
+    body.id = "cpp-confirm-body";
+    // Built from text, not innerHTML, so a file name carrying markup can't
+    // inject anything.
+    body.textContent = describe(target.names) + " This can't be undone.";
+    box.setAttribute("aria-describedby", body.id);
+
+    var actions = document.createElement("div");
+    actions.className = "cpp-confirm-actions";
+
+    var cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "cpp-confirm-cancel";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", close);
+
+    var go = document.createElement("button");
+    go.type = "button";
+    go.className = "cpp-confirm-go";
+    go.textContent = "Delete";
+    go.addEventListener("click", function () { confirmed(target); });
+
+    actions.appendChild(cancel);
+    actions.appendChild(go);
+    box.appendChild(title);
+    box.appendChild(body);
+    box.appendChild(actions);
+    back.appendChild(box);
+
+    back.addEventListener("click", function (e) {
+      if (e.target === back) close();
+    });
+    // Keys are handled on the dialog and stopped there, so claude's own
+    // shortcuts don't also act on them while it's open.
+    back.addEventListener("keydown", function (e) {
+      e.stopPropagation();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        return close();
+      }
+      if (e.key !== "Tab") return;
+      // Two focusable controls, so the trap is just a swap at either end.
+      var first = cancel;
+      var last = go;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
+
+    document.body.appendChild(back);
+    dialog = back;
+    // Cancel takes focus, not Delete: Enter on a dialog you didn't mean to
+    // open should be the harmless answer.
+    cancel.focus();
+  }
+
+  // Metadata (name/description/defaultEnabled) lives in features/registry.js.
+  CPP.registerFeature({
+    id: "file-delete-guard",
+
+    onInit: function (c) {
+      ctx = c;
+      document.addEventListener("click", onClickCapture, true);
+    },
+
+    onTeardown: function () {
+      document.removeEventListener("click", onClickCapture, true);
+      close();
+    }
+  });
+})();

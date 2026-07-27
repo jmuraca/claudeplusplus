@@ -78,6 +78,11 @@ This asks first.
 
 - Covers a **single file** and a **multi-select**, in either grid or list view, naming what's
   about to go — one file by name, several by name with an "and N more" tail.
+- Reads like the [project-delete dialog](#️-delete-guard) above: a heading naming the target
+  (*Delete file: notes.txt*), the plain *"Are you sure you want to delete notes.txt?"* line,
+  then a blank line and the amber **⚠️** warning spelling out what's lost. It shares that
+  dialog's own warning class, so one edit restyles both and they can't drift. The one thing
+  it drops is the type-the-name box — deleting a file doesn't warrant making you spell it out.
 - **Cancel** holds focus, so a stray Enter on a dialog you didn't mean to open is the harmless
   answer. Escape and a click on the backdrop also cancel; Tab is trapped between the two
   buttons.

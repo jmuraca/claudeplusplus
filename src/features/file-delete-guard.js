@@ -198,23 +198,43 @@
 
   // ---------- the confirmation ----------
 
-  // Names them when they're known, counts them when they aren't — the count is
-  // read off claude's own button label, so it's right even on a pass where the
-  // tiles couldn't be matched up.
-  function describe(target) {
-    var names = target.names;
-    var tail = " will be removed from this project.";
-    if (names.length !== target.count) {
-      return target.count + " selected " + plural(target.count) + tail;
-    }
-    if (names.length === 1) return "“" + names[0] + "”" + tail;
-    var shown = names.slice(0, 5);
-    var rest = names.length - shown.length;
-    return shown.join(", ") + (rest ? ", and " + rest + " more" : "") + tail;
-  }
+  // Wording follows the project-delete dialog (delete-guard.js) so the two read
+  // as the same warning: a heading that names the target, a plain "are you
+  // sure" line, then a blank line and the amber ⚠️ notice spelling out what
+  // goes. Everything except that dialog's type-the-name input — deleting a file
+  // doesn't warrant making someone spell it out.
 
   function plural(n) {
     return n === 1 ? "file" : "files";
+  }
+
+  // True when every file at stake could be named. A bulk delete whose count
+  // came off claude's button label may know how many without knowing which.
+  function named(target) {
+    return target.names.length > 0 && target.names.length === target.count;
+  }
+
+  function titleFor(target) {
+    if (target.count !== 1) return "Delete " + target.count + " files";
+    return named(target) ? "Delete file: " + target.names[0] : "Delete file";
+  }
+
+  function askFor(target) {
+    if (target.count !== 1) {
+      return "Are you sure you want to delete these " + target.count + " files?";
+    }
+    return named(target)
+      ? "Are you sure you want to delete " + target.names[0] + "?"
+      : "Are you sure you want to delete this file?";
+  }
+
+  // What the warning line bolds: the names when they're known, the count when
+  // they aren't.
+  function subjectFor(target) {
+    if (!named(target)) return target.count + " selected " + plural(target.count);
+    var shown = target.names.slice(0, 5);
+    var rest = target.names.length - shown.length;
+    return shown.join(", ") + (rest ? ", and " + rest + " more" : "");
   }
 
   function close() {
@@ -251,19 +271,27 @@
     var title = document.createElement("h2");
     title.className = "cpp-confirm-title";
     title.id = "cpp-confirm-title";
-    title.textContent =
-      target.count === 1
-        ? "Delete this file?"
-        : "Delete " + target.count + " files?";
+    title.textContent = titleFor(target);
     box.setAttribute("aria-labelledby", title.id);
 
     var body = document.createElement("p");
     body.className = "cpp-confirm-body";
     body.id = "cpp-confirm-body";
-    // Built from text, not innerHTML, so a file name carrying markup can't
-    // inject anything.
-    body.textContent = describe(target) + " This can't be undone.";
+    body.textContent = askFor(target);
     box.setAttribute("aria-describedby", body.id);
+
+    // The same class the project-delete warning wears, so both dialogs pick up
+    // one definition and can't drift apart. Built from nodes rather than
+    // innerHTML, so a file name carrying markup can't inject anything.
+    var warning = document.createElement("p");
+    warning.className = "cpp-del-warning";
+    var subject = document.createElement("strong");
+    subject.textContent = subjectFor(target);
+    warning.append(
+      "⚠️ This will permanently remove ",
+      subject,
+      " from this project. This can't be undone."
+    );
 
     var actions = document.createElement("div");
     actions.className = "cpp-confirm-actions";
@@ -284,6 +312,7 @@
     actions.appendChild(go);
     box.appendChild(title);
     box.appendChild(body);
+    box.appendChild(warning);
     box.appendChild(actions);
     back.appendChild(box);
 

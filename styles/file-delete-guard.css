@@ -38,13 +38,23 @@
   color: hsl(var(--text-100, 0 0% 10%));
 }
 
-/* A long file name is quoted in here, so it has to be allowed to wrap rather
+/* A long file name is named in here, so it has to be allowed to wrap rather
    than push the dialog wider than its max-width. */
 .cpp-confirm-body {
-  margin: 0 0 1.25rem;
+  margin: 0;
   font-size: 0.875rem;
   line-height: 1.5;
   color: hsl(var(--text-300, 0 0% 35%));
+  overflow-wrap: anywhere;
+}
+
+/* The ⚠️ line. Its type and amber come from .cpp-del-warning in content.css —
+   the project-delete dialog's own warning class, shared so the two read
+   identically and one edit changes both. Only the placement is set here: the
+   12px above it is the same gap .cpp-del-guard opens up over there, which is
+   the blank line that sets the warning apart from the question. */
+.cpp-confirm .cpp-del-warning {
+  margin: 12px 0 1.25rem;
   overflow-wrap: anywhere;
 }
 

@@ -214,30 +214,38 @@
     return target.names.length > 0 && target.names.length === target.count;
   }
 
+  // One file and many read the same way — a count in the heading and the
+  // question, the names in the list below. A single file used to be special-
+  // cased into the heading and named inline, which meant the two sizes of the
+  // same dialog looked like two different dialogs.
+  function countOf(target) {
+    return target.count + " " + plural(target.count);
+  }
+
   function titleFor(target) {
-    if (target.count !== 1) return "Delete " + target.count + " files";
-    return named(target) ? "Delete file: " + target.names[0] : "Delete file";
+    return "Delete " + countOf(target);
   }
 
   function askFor(target) {
-    var tail = " from this project?";
-    if (target.count !== 1) {
-      return "Are you sure you want to delete these " + target.count + " files" + tail;
-    }
-    return named(target)
-      ? "Are you sure you want to delete " + target.names[0] + tail
-      : "Are you sure you want to delete this file" + tail;
+    return (
+      "Are you sure you want to delete " + countOf(target) + " from this project?"
+    );
   }
 
   // The warning block: the ⚠️ lead, what's going, then "This can't be undone."
   // set apart on its own line.
   //
-  // Several files are listed one per line rather than run together in a
-  // sentence — claude's file names are long and near-identical often enough
+  // Files are listed one per line rather than run together in a sentence —
+  // claude's file names are long and near-identical often enough
   // (…EMRS2026FAQs 1.pdf beside …EMRS2026ApplicationGuidelines 1.pdf) that a
   // comma-separated run is unreadable at exactly the moment it matters most.
   // The list scrolls past a few items, so a large selection can be named in
-  // full without the dialog growing off-screen.
+  // full without the dialog growing off-screen. A lone file is listed too, so
+  // one and many are the same dialog at different sizes.
+  //
+  // The inline fallback is for a bulk delete whose count came off claude's
+  // button label without the tiles being readable: there is a number to show
+  // but no names to list.
   function buildWarning(target) {
     var box = document.createElement("div");
     box.className = "cpp-del-warning";
@@ -246,7 +254,7 @@
     lead.className = "cpp-confirm-lead";
     box.appendChild(lead);
 
-    if (named(target) && target.count > 1) {
+    if (named(target)) {
       lead.textContent = "⚠️ This will permanently remove";
       var list = document.createElement("ul");
       list.className = "cpp-confirm-files";
@@ -260,9 +268,7 @@
       box.appendChild(list);
     } else {
       var subject = document.createElement("strong");
-      subject.textContent = named(target)
-        ? target.names[0]
-        : target.count + " selected " + plural(target.count);
+      subject.textContent = target.count + " selected " + plural(target.count);
       lead.append("⚠️ This will permanently remove ", subject, ".");
     }
 

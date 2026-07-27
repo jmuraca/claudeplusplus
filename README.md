@@ -76,19 +76,30 @@ under the pointer the moment you hover a thumbnail, and the bulk **Delete** that
 files are ticked takes the whole selection in one click. Re-uploading is the only way back.
 This asks first.
 
-- Covers a **single file** and a **multi-select**, in either grid or list view, naming what's
-  about to go — one file by name, several by name with an "and N more" tail.
-- Reads like the [project-delete dialog](#️-delete-guard) above: a heading naming the target,
-  the plain *"Are you sure you want to delete … from this project?"* line, then a blank line
-  and the amber **⚠️** warning spelling out what's lost, with *"This can't be undone."* set
-  apart on its own line. It shares that dialog's own warning class, so one edit restyles both
-  and they can't drift. The one thing it drops is the type-the-name box — deleting a file
-  doesn't warrant making you spell it out.
-- Several files are listed **one per line**, not run together in a sentence: claude's file
-  names are long and near-identical often enough (`…EMRS2026FAQs 1.pdf` beside
+- Covers a **single file** and a **multi-select**, in either grid or list view, always naming
+  what's about to go:
+
+  > **Delete 2 files**
+  >
+  > Are you sure you want to delete 2 files from this project?
+  >
+  > ⚠️ This will permanently remove
+  > - EnergyTechMarketReadySupportEMRS2026FAQs 1.pdf
+  > - EnergyTechMarketReadySupportEMRS2026ApplicationGuidelines 1.pdf
+  >
+  > This can't be undone.
+
+- One file and many are the **same dialog at different sizes** — a count in the heading and
+  the question, the names in the list below — rather than a lone file being special-cased
+  into the heading and named inline.
+- Files are listed **one per line**, not run together in a sentence: claude's file names are
+  long and near-identical often enough (`…EMRS2026FAQs 1.pdf` beside
   `…EMRS2026ApplicationGuidelines 1.pdf`) that a comma-separated run is unreadable at exactly
   the moment it matters most. The list scrolls past a few items, so every name is shown in
   full without the dialog growing off-screen.
+- The amber **⚠️** notice wears the [project-delete dialog](#️-delete-guard)'s own warning
+  class, so one edit restyles both and they can't drift. The one thing that format drops is
+  the type-the-name box — deleting a file doesn't warrant making you spell it out.
 - **Cancel** holds focus, so a stray Enter on a dialog you didn't mean to open is the harmless
   answer. Escape and a click on the backdrop also cancel; Tab is trapped between the two
   buttons.

@@ -151,24 +151,19 @@ test("the tile × is stopped before it deletes anything", () => {
   h.click(h.$("remove-0"));
   assert.ok(h.dialog(), "a confirmation opens");
   assert.deepEqual(h.reached, [], "the click never reaches claude's handler");
-  // Same shape as the project-delete dialog: heading naming the target, the
-  // "are you sure" line, then the ⚠️ warning.
-  assert.equal(h.titleText(), "Delete file: alpha.pdf");
-  assert.equal(h.body(), "Are you sure you want to delete alpha.pdf from this project?");
+  // One file and many are the same dialog at different sizes: a count in the
+  // heading and the question, the names in the list below.
+  assert.equal(h.titleText(), "Delete 1 file");
+  assert.equal(h.body(), "Are you sure you want to delete 1 file from this project?");
   assert.match(h.lead(), /^⚠️ /, "the warning leads with the emoji");
-  assert.equal(h.lead(), "⚠️ This will permanently remove alpha.pdf.");
-  assert.deepEqual(h.listed(), [], "one file is named inline, not bulleted");
+  assert.equal(h.lead(), "⚠️ This will permanently remove");
+  assert.deepEqual(h.listed(), ["alpha.pdf"], "a lone file is listed too");
   assert.equal(
     h.document.querySelector(".cpp-confirm-final").textContent,
     "This can't be undone.",
     "set apart on its own line"
   );
-  assert.equal(
-    h.document.querySelector(".cpp-confirm .cpp-del-warning strong").textContent,
-    "alpha.pdf",
-    "the target is bolded, as it is in the project dialog"
-  );
-  assert.equal(h.document.querySelector(".cpp-confirm input"), null, "but no name to type");
+  assert.equal(h.document.querySelector(".cpp-confirm input"), null, "and no name to type");
 });
 
 test("confirming re-issues the click on claude's own control", () => {
@@ -208,7 +203,7 @@ test("a bulk delete is stopped and names the whole selection", () => {
   assert.ok(h.dialog());
   assert.deepEqual(h.reached, []);
   assert.equal(h.titleText(), "Delete 2 files");
-  assert.equal(h.body(), "Are you sure you want to delete these 2 files from this project?");
+  assert.equal(h.body(), "Are you sure you want to delete 2 files from this project?");
   assert.equal(h.lead(), "⚠️ This will permanently remove");
   assert.deepEqual(h.listed(), ["alpha.pdf", "notes.txt"], "one bullet per file");
   assert.match(h.warning(), /can't be undone/);

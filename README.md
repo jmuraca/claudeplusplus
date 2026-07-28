@@ -571,18 +571,64 @@ push and PR that touches `src/` or `test/`.
 
 ## Releasing
 
-`.github/workflows/release.yml` builds the packaged zip and publishes it to GitHub Releases on
-every push to `main` that touches `manifest.json`, `src/`, `styles/`, or `icons/`. It stamps
-the manifest version with the build date (`yyyy.m.d`, plus a fourth segment for a second
-release the same day) and zips `manifest.json src styles icons` from a clean checkout.
+Releases are fully automated. `.github/workflows/release.yml` runs on every push to `main` that
+touches `manifest.json`, `src/`, `styles/`, or `icons/` (and from the **Run workflow** button),
+and it:
 
-To publish to the Web Store, upload the `claudeplusplus.zip` **asset from the GitHub release**.
-Do not upload a zip built by hand from the working tree — it will contain whatever is
-uncommitted and can easily be an older or half-finished build.
+1. runs `npm test` — a failure here stops the release, so a red suite never reaches the store;
+2. stamps the manifest version with the build date (`yyyy.m.d`, plus a fourth segment for a
+   second release the same day);
+3. zips `manifest.json src styles icons` from a clean checkout;
+4. publishes that zip as a GitHub Release;
+5. uploads it to the Chrome Web Store and submits it for review. Google's review is the only
+   manual gate left — the new version goes live on its own once approved.
 
 Because the zip is built from a clean checkout, every file the manifest names must be committed.
 An uncommitted asset produces a zip whose manifest points at files that aren't in the archive,
 and the Web Store rejects that at upload validation rather than at build time.
+
+### Web Store credentials
+
+Step 5 needs four repository secrets (**Settings → Secrets and variables → Actions**). With
+`CWS_EXTENSION_ID` unset the step is skipped and the rest of the release still runs, which is
+what happens on a fork.
+
+| Secret | Where it comes from |
+| --- | --- |
+| `CWS_EXTENSION_ID` | The item ID in the store dashboard URL — for this extension, `ejkciacghkjmblphbmfbbjmbiilfbgde`. |
+| `CWS_CLIENT_ID` | An OAuth **Desktop app** client, created in the Google Cloud console. |
+| `CWS_CLIENT_SECRET` | Same client. |
+| `CWS_REFRESH_TOKEN` | Minted once against that client (below). |
+
+To set it up: in the [Google Cloud console](https://console.cloud.google.com/), create a project,
+enable the **Chrome Web Store API**, then under **APIs & Services → Credentials** create an OAuth
+client of type **Desktop app**. Sign in as the account that owns the store listing, and if the
+consent screen is in *Testing* mode add that account as a test user — otherwise the refresh token
+expires after seven days.
+
+Then mint the refresh token. Visit this URL (substituting the client ID), approve, and copy the
+`code=` value out of the redirect:
+
+```
+https://accounts.google.com/o/oauth2/auth?response_type=code&access_type=offline&prompt=consent&scope=https://www.googleapis.com/auth/chromewebstore&redirect_uri=http://localhost&client_id=YOUR_CLIENT_ID
+```
+
+```bash
+curl -s -d "client_id=YOUR_CLIENT_ID" -d "client_secret=YOUR_CLIENT_SECRET" \
+     -d "code=THE_CODE" -d "grant_type=authorization_code" \
+     -d "redirect_uri=http://localhost" \
+     https://oauth2.googleapis.com/token
+```
+
+The `refresh_token` in the response is `CWS_REFRESH_TOKEN`. It is long-lived but not permanent —
+changing the Google account password or leaving the client unused for six months revokes it, and
+the workflow says so explicitly when the token exchange fails. Re-run the two steps above to
+replace it.
+
+Two failures are worth recognising in the log. `ITEM_NOT_UPDATABLE` on upload means the previous
+submission is still in review — wait for it to clear and re-run the workflow from the Actions tab.
+A publish that fails *after* a successful upload leaves the new package sitting as a draft in the
+dashboard, so it can be submitted by hand from there.
 
 ## Notes / limitations
 

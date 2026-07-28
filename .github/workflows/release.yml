@@ -1,6 +1,7 @@
 name: Release
 
-# Builds the packaged Chrome extension zip and publishes it to GitHub Releases.
+# Builds the packaged Chrome extension zip, publishes it to GitHub Releases, and
+# submits it to the Chrome Web Store for review.
 # Version numbers are the build date (yyyy.mm.dd), with a counter appended if
 # more than one release happens on the same day (yyyy.mm.dd.N).
 
@@ -19,11 +20,36 @@ on:
 permissions:
   contents: write
 
+# Two pushes landing close together would otherwise race: both compute the same
+# tag, and the Web Store rejects a second upload while the first is in review.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Job-level so the "is the store configured?" check below can read them: the
+    # `secrets` context is not available in a step's `if`, but `env` is.
+    env:
+      CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+      CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+      CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+      CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+
+      # Gate the release on the suite. test.yml runs the same tests on push, but
+      # that's a separate workflow with its own timing and can't block this one —
+      # a red suite has to stop the store submission, not race it.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
 
       - name: Compute version
         id: version
@@ -58,6 +84,9 @@ jobs:
 
       - name: Build extension zip
         run: |
+          # zip updates an existing archive rather than replacing it, so an
+          # earlier build's stale entries would survive into this one.
+          rm -f claudeplusplus.zip
           zip -r claudeplusplus.zip \
             manifest.json src styles icons \
             -x '*.DS_Store'
@@ -73,9 +102,109 @@ jobs:
             --target "${{ github.sha }}" \
             --notes "Automated build of the Claude++ Chrome extension.
 
-          **Install:**
+          This build is submitted to the Chrome Web Store automatically and goes
+          live once Google's review passes.
+
+          **Install the unpacked build:**
           1. Download \`claudeplusplus.zip\` below and unzip it.
           2. Open \`chrome://extensions\` and enable **Developer mode**.
-          3. Click **Load unpacked** and select the unzipped folder.
+          3. Click **Load unpacked** and select the unzipped folder."
 
-          The same zip can be uploaded to the Chrome Web Store dashboard."
+      # Upload the package to the Chrome Web Store and submit it for review.
+      # Requires four repo secrets:
+      #   CWS_EXTENSION_ID   - the item ID from the store dashboard URL
+      #   CWS_CLIENT_ID      - OAuth2 client ID (Google Cloud console)
+      #   CWS_CLIENT_SECRET  - OAuth2 client secret
+      #   CWS_REFRESH_TOKEN  - long-lived refresh token for the publishing account
+      # See "Releasing" in the README for how to mint the refresh token. The step
+      # is skipped entirely when CWS_EXTENSION_ID isn't set, so the GitHub release
+      # still works on a fork or before the store credentials exist.
+      - name: Submit to Chrome Web Store
+        if: env.CWS_EXTENSION_ID != ''
+        run: |
+          set -euo pipefail
+
+          for name in CWS_CLIENT_ID CWS_CLIENT_SECRET CWS_REFRESH_TOKEN; do
+            if [ -z "${!name}" ]; then
+              echo "CWS_EXTENSION_ID is set but $name is missing." >&2
+              echo "Set all four secrets, or none, to skip store submission." >&2
+              exit 1
+            fi
+          done
+
+          api() {
+            # Body and HTTP status in one shot. `curl -f` would hide the response
+            # body on an error, and Google puts the useful part of the failure
+            # there — so check the status ourselves instead.
+            curl -s -w '\n%{http_code}' "$@"
+          }
+
+          echo "Requesting an access token..."
+          # Not logged: the response carries the access token itself.
+          TOKEN_BODY=$(curl -s \
+            -d "client_id=${CWS_CLIENT_ID}" \
+            -d "client_secret=${CWS_CLIENT_SECRET}" \
+            -d "refresh_token=${CWS_REFRESH_TOKEN}" \
+            -d "grant_type=refresh_token" \
+            "https://oauth2.googleapis.com/token")
+
+          ACCESS_TOKEN=$(jq -r '.access_token // empty' <<<"$TOKEN_BODY")
+          if [ -z "$ACCESS_TOKEN" ]; then
+            echo "Failed to obtain an access token." >&2
+            jq -r '"\(.error // "unknown"): \(.error_description // "no detail")"' \
+              <<<"$TOKEN_BODY" >&2 || true
+            echo "A refresh token is revoked by changing the Google account password" >&2
+            echo "or by leaving the OAuth client unused for six months; mint a new one." >&2
+            exit 1
+          fi
+
+          echo "Uploading claudeplusplus.zip to item ${CWS_EXTENSION_ID}..."
+          RESPONSE=$(api \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "x-goog-api-version: 2" \
+            -X PUT -T claudeplusplus.zip \
+            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${CWS_EXTENSION_ID}")
+          UPLOAD=$(sed '$d' <<<"$RESPONSE")
+          CODE=$(tail -n1 <<<"$RESPONSE")
+          echo "$UPLOAD"
+
+          # Tolerate an unparseable body (an empty 5xx, say); the HTTP code and
+          # the empty state below still produce a clear failure.
+          STATE=$(jq -r '.uploadState // empty' <<<"$UPLOAD" 2>/dev/null || true)
+          if [ "$CODE" != "200" ] || [ "$STATE" != "SUCCESS" ]; then
+            echo "Upload failed (HTTP $CODE, state: ${STATE:-none})." >&2
+            jq -r '.itemError[]?.error_detail // empty' <<<"$UPLOAD" >&2 || true
+            # The store refuses a new package while the previous one is still in
+            # review; that's the one failure here that isn't a broken build.
+            if grep -q 'ITEM_NOT_UPDATABLE' <<<"$UPLOAD"; then
+              echo "The previous submission is still in review. Wait for it to" >&2
+              echo "clear, then re-run this workflow from the Actions tab." >&2
+            fi
+            exit 1
+          fi
+
+          echo "Submitting for review on the public channel..."
+          RESPONSE=$(api \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "x-goog-api-version: 2" \
+            -H "Content-Length: 0" \
+            -X POST \
+            "https://www.googleapis.com/chromewebstore/v1.1/items/${CWS_EXTENSION_ID}/publish")
+          PUBLISH=$(sed '$d' <<<"$RESPONSE")
+          CODE=$(tail -n1 <<<"$RESPONSE")
+          echo "$PUBLISH"
+
+          # A successful publish returns a status array of ["OK"] (live now) or
+          # ["ITEM_PENDING_REVIEW"] (queued, goes live on approval). Both mean
+          # Google accepted the submission.
+          if [ "$CODE" = "200" ] &&
+             jq -e '[.status[]?] | any(. == "OK" or . == "ITEM_PENDING_REVIEW")' \
+               <<<"$PUBLISH" >/dev/null 2>&1; then
+            echo "Submitted ${{ steps.version.outputs.manifest_version }} to the Chrome Web Store."
+          else
+            echo "Publish failed (HTTP $CODE)." >&2
+            jq -r '.statusDetail[]? // empty' <<<"$PUBLISH" >&2 || true
+            echo "The package uploaded but was not submitted; it is sitting as a" >&2
+            echo "draft in the store dashboard." >&2
+            exit 1
+          fi

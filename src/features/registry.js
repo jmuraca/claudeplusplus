@@ -119,6 +119,13 @@
       defaultEnabled: true
     },
     {
+      id: "search-new-tab",
+      name: "Open search results in a new tab",
+      description:
+        "Search results in the ⌘K/Ctrl+K palette are buttons, not links, so Ctrl+click and middle-click open them in the tab you're already reading. This gives them link behaviour: Ctrl+click (⌘+click on macOS), middle-click, or Ctrl/⌘+Enter on the highlighted row opens that chat in a new tab and leaves the palette open on its results, so you can open several in a row. A plain click still navigates in place.",
+      defaultEnabled: true
+    },
+    {
       id: "keyboard-shortcuts-inject",
       name: "Keyboard shortcuts in help menu",
       description:

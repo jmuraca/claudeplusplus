@@ -317,6 +317,32 @@ message clickable.
   hides the ×, so a tap there discards as it always has — intercepting it would leave no way
   to discard at all.
 
+### 🔗 Open search results in a new tab
+claude.ai's search — the **⌘K / Ctrl+K** command palette — draws each result as a
+`<button>`, not a link. It looks like a link but has no `href`, so **Ctrl+click**,
+middle-click and the context menu's *Open link in new tab* all fall through to a plain
+activation: the chat replaces whatever you were reading, and comparing three results means
+three round trips through the palette. This gives those rows the link behaviour their markup
+implies.
+
+- **Ctrl+click** (**⌘+click** on macOS), **middle-click**, or **Ctrl/⌘+Enter** on the
+  highlighted row opens that result in a new tab. The palette stays open on its results, so
+  several can be opened in a row. An unmodified click still navigates in place, exactly as
+  before.
+- The gesture is the **platform's**, not both at once: on macOS Ctrl+click is the secondary
+  click, so it's left alone for the context menu rather than answered with a tab the user
+  didn't ask for.
+- The tab is opened by clicking a throwaway anchor rather than by calling `window.open`, so
+  the **browser** applies its own disposition rules: Ctrl+click lands a background tab,
+  Ctrl+Shift+click a foreground one, and middle-click a background one — the same as every
+  other link on the page.
+- The URL is **rebuilt from the row**, which carries only the item's id (in its DOM id) and
+  its kind (`data-item-type`): a conversation becomes `/chat/<uuid>`, a Claude Code session
+  `/code/<session id>`, a project `/project/<uuid>`.
+- A kind with no known page (the palette also lists actions like *New chat*) is **left
+  alone**: the click falls through to claude's own handler, which lands you in the right
+  place in this tab rather than opening a guess in a new one.
+
 More features can be toggled on/off from the popup.
 
 ## Install

@@ -76,6 +76,12 @@ function harness() {
   window.CPP = {
     util: {
       composerEditor: () => editor,
+      // Mirrors core.js: an event target is often a text node, which a bare
+      // Element.closest can't be called on.
+      closestEl: (node, sel) => {
+        const el = node && node.nodeType === 1 ? node : node && node.parentElement;
+        return (el && el.closest && el.closest(sel)) || null;
+      },
       // Mirrors core.js. jsdom has no innerText, so this exercises the
       // textContent branch; the newline-preserving one only exists in a browser.
       plainText: (el) =>

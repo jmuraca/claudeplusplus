@@ -50,9 +50,7 @@
 
   // The queued bubble a click landed on, or null if the click wasn't on one.
   function queuedBubble(node) {
-    var el = node && node.nodeType === 1 ? node : node && node.parentElement;
-    if (!el || !el.closest) return null;
-    var bubble = el.closest(BUBBLE_SEL);
+    var bubble = CPP.util.closestEl(node, BUBBLE_SEL);
     if (!bubble || !bubble.closest(QUEUE_SEL)) return null;
     return bubble;
   }

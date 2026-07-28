@@ -101,7 +101,7 @@
       id: "draft-mode",
       name: "Draft mode (Shift+Tab)",
       description:
-        "Press Shift+Tab in the message box to arm Draft mode: keep typing, attaching files, dictating, and switching models freely, with no way to submit by accident. The Send button turns into a blue Pause; press Shift+Tab again (or click it) to return to normal. Shift+Enter still inserts a newline.",
+        "Press Shift+Tab in the message box to arm Draft mode: keep typing, attaching files, dictating, and switching models freely, with no way to submit by accident. The Send button turns into a blue Pause; press Shift+Tab again (or click it) to return to normal. No Enter submits while paused: Shift+Enter still inserts a newline, and Ctrl/⌘+Enter breaks the line in its place — which inside a list starts the next item. Tab and Shift+Tab keep indenting and outdenting list items.",
       defaultEnabled: true
     },
     {
@@ -116,6 +116,13 @@
       name: "Edit queued messages",
       description:
         "A message queued while Claude is replying can normally only be discarded. This makes it clickable: click a queued message (or focus it and press Enter) and its text returns to the message box — added to the end of whatever you've already typed — and it leaves the queue, so you can fix it up and send it again. The × beside it still discards.",
+      defaultEnabled: true
+    },
+    {
+      id: "search-new-tab",
+      name: "Open search results in a new tab",
+      description:
+        "Search results in the ⌘K/Ctrl+K palette are buttons, not links, so Ctrl+click and middle-click open them in the tab you're already reading. This gives them link behaviour: Ctrl+click (⌘+click on macOS), middle-click, or Ctrl/⌘+Enter on the highlighted row opens that chat in a new tab and leaves the palette open on its results, so you can open several in a row. A plain click still navigates in place.",
       defaultEnabled: true
     },
     {

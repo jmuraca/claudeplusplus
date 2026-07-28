@@ -219,6 +219,14 @@ button) to return to normal.
   is neutralized the same way, since draft mode is a text-only feature.
 - The hover tooltip on those buttons is retitled while draft mode is on, and the state
   resets to normal when you switch chats.
+- **No Enter submits while paused** — plain or with Ctrl/⌘, in a list or out of it. Instead,
+  **Ctrl/⌘+Enter** takes over Enter's editing job: it breaks the line, which inside a list
+  means the **next list item**. (Shift+Enter still adds a line *within* the current item, as
+  it always has.) The key never reaches claude's submit handler; the line break is inserted
+  directly, so drafting a bulleted list works without ever arming the send path.
+- **Tab and Shift+Tab keep their list jobs**: Tab indents an item, Shift+Tab outdents one.
+  Since Shift+Tab is the outdent inside a list, the mode toggle stands down there — move the
+  caret out of the list to switch modes, or click the blue Pause.
 
 ### 😀 Emoji autocomplete
 Slack-style emoji in the message box, driven off what you type between colons.
@@ -316,6 +324,32 @@ message clickable.
 - On a **touch screen** claude lays its own full-bubble Discard target over the message and
   hides the ×, so a tap there discards as it always has — intercepting it would leave no way
   to discard at all.
+
+### 🔗 Open search results in a new tab
+claude.ai's search — the **⌘K / Ctrl+K** command palette — draws each result as a
+`<button>`, not a link. It looks like a link but has no `href`, so **Ctrl+click**,
+middle-click and the context menu's *Open link in new tab* all fall through to a plain
+activation: the chat replaces whatever you were reading, and comparing three results means
+three round trips through the palette. This gives those rows the link behaviour their markup
+implies.
+
+- **Ctrl+click** (**⌘+click** on macOS), **middle-click**, or **Ctrl/⌘+Enter** on the
+  highlighted row opens that result in a new tab. The palette stays open on its results, so
+  several can be opened in a row. An unmodified click still navigates in place, exactly as
+  before.
+- The gesture is the **platform's**, not both at once: on macOS Ctrl+click is the secondary
+  click, so it's left alone for the context menu rather than answered with a tab the user
+  didn't ask for.
+- The tab is opened by clicking a throwaway anchor rather than by calling `window.open`, so
+  the **browser** applies its own disposition rules: Ctrl+click lands a background tab,
+  Ctrl+Shift+click a foreground one, and middle-click a background one — the same as every
+  other link on the page.
+- The URL is **rebuilt from the row**, which carries only the item's id (in its DOM id) and
+  its kind (`data-item-type`): a conversation becomes `/chat/<uuid>`, a Claude Code session
+  `/code/<session id>`, a project `/project/<uuid>`.
+- A kind with no known page (the palette also lists actions like *New chat*) is **left
+  alone**: the click falls through to claude's own handler, which lands you in the right
+  place in this tab rather than opening a guess in a new one.
 
 More features can be toggled on/off from the popup.
 

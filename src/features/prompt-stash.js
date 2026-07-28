@@ -42,10 +42,7 @@
   var GAP = 16; // between the card and the composer
   var EDGE = 12; // keep the card this far from the viewport edge
 
-  var IS_MAC = /Mac|iP(hone|ad|od)/.test(
-    (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || ""
-  );
-  var CHORD = IS_MAC ? "⌘S" : "Ctrl+S";
+  var CHORD = CPP.util.IS_MAC ? "⌘S" : "Ctrl+S";
 
   var ctx = null;
   var started = false;

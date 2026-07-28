@@ -7,7 +7,7 @@
 //   Alt+↑  Previous message       (scroll-nav)
 //   Alt+↓  Next message           (scroll-nav)
 //   Shift+Tab  Draft mode         (draft-mode)
-//   Ctrl+S  Stash prompt          (prompt-stash)
+//   Ctrl+S  Stash prompt          (prompt-stash; ⌘S on macOS)
 //
 // The dialog is owned by React and unmounted/remounted on each open, so we
 // observe body-level mutations and re-inject whenever the dialog reappears.
@@ -19,11 +19,16 @@
   var ATTR = "data-cpp-shortcut";
   var DIALOG_SEL = '[role="dialog"]';
 
+  // The accelerator these shortcuts are actually bound to on this machine.
+  // prompt-stash answers to ⌘S on a Mac and labels its own card that way, so a
+  // dialog row reading "Ctrl S" there names a chord that does nothing.
+  var ACCEL = CPP.util.IS_MAC ? "⌘" : "Ctrl";
+
   var SHORTCUTS = [
     { label: "Previous message", keys: ["Alt", "↑"] },
     { label: "Next message", keys: ["Alt", "↓"] },
     { label: "Draft mode", keys: ["Shift", "Tab"] },
-    { label: "Stash prompt", keys: ["Ctrl", "S"] }
+    { label: "Stash prompt", keys: [ACCEL, "S"] }
   ];
 
   // Build one shortcut row matching claude's own markup.

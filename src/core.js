@@ -151,12 +151,31 @@
     // resolves to.
     COMPOSER_SEL: '[data-chat-input-container], [data-testid="chat-input"]',
 
-    // True when `node` (or the element it sits in) is inside something matching
-    // `sel`. Tolerates a text node or null, which a bare Element.closest won't.
-    closest: function (node, sel) {
+    // The nearest element matching `sel` at or above `node`, or null. Tolerates
+    // a text node or null, which a bare Element.closest won't — an event target
+    // is routinely a text node, so every feature that reads a click has to start
+    // here, and each had grown its own copy of the walk.
+    closestEl: function (node, sel) {
       var el = node && node.nodeType === 1 ? node : node && node.parentElement;
-      return !!(el && el.closest && el.closest(sel));
+      return (el && el.closest && el.closest(sel)) || null;
     },
+
+    // The same question as a yes/no, for callers that only need to know whether
+    // an event came from inside something.
+    closest: function (node, sel) {
+      return !!util.closestEl(node, sel);
+    },
+
+    // True on Apple keyboards, where the modifier conventions are not the ones
+    // the rest of the world uses: ⌘ is the accelerator (⌘+click opens a link in
+    // a new tab), while Ctrl+click is the secondary click that opens the context
+    // menu. A feature that reads Ctrl as an accelerator without checking this
+    // fires on a gesture the user aimed at the menu.
+    IS_MAC: /Mac|iP(hone|ad|od)/.test(
+      (navigator.userAgentData && navigator.userAgentData.platform) ||
+        navigator.platform ||
+        ""
+    ),
 
     // The composer's contenteditable, or null when it isn't mounted. Candidates
     // are tried most-specific first.

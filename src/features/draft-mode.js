@@ -6,6 +6,10 @@
 // but nothing can submit by accident. Press Shift+Tab again (or click the
 // button) to return to normal "run" mode.
 //
+// Lists are where its keys give way to claude's editor: Shift+Tab outdents an
+// item rather than toggling the mode, and Ctrl/⌘+Enter starts the next item
+// rather than doing nothing. See the list-aware keys section below.
+//
 // Visible state is all CSS, keyed off a single `cpp-draft` class on <html> — so
 // it survives claude.ai re-mounting the composer on nearly every keystroke with
 // no re-injection. The composer's action button turns into a blue Pause (the
@@ -16,7 +20,9 @@
 // in dispatch, ahead of claude's ProseMirror editor (on the contenteditable),
 // its base-ui button handlers, and every React handler — so one listener
 // neutralizes every submit path:
-//   • Enter in the composer (Shift+Enter is left alone, so newlines still work)
+//   • Enter in the composer, plain or with Ctrl/⌘ (Shift+Enter is left alone, so
+//     newlines still work; Ctrl/⌘+Enter inserts one instead of submitting, which
+//     is how a list gets its next item while paused)
 //   • a click on the Send or voice button (which instead returns you to run mode)
 //
 // Two smaller pieces round it out: while draft mode is on we rewrite the hover
@@ -58,6 +64,52 @@
   // CPP.util (core.js), so draft-mode, prompt-stash and emoji-autocomplete key
   // off the same source. The Shift+Tab toggle is scoped to the composer via
   // CPP.util.inComposer so it keeps its normal focus-stepping job elsewhere.
+
+  // ---- list-aware keys ----------------------------------------------------
+  // The message box is a ProseMirror editor, and inside a list it binds keys the
+  // rest of the box doesn't. Two of them are ours the rest of the time, and both
+  // stand down in a list rather than cost the user an editing command with no
+  // replacement:
+  //
+  //   • Tab and Shift+Tab indent and outdent an item — Shift+Tab being the only
+  //     way to pull one back a level. Tab was never ours; Shift+Tab hands itself
+  //     back in a list, so the mode toggle is simply unavailable there.
+  //   • Enter starts the next item. That one stays blocked — Enter must never
+  //     reach the submit handler, in a list or out of it — so Ctrl/⌘+Enter does
+  //     the editing job in its place while paused; see insertBreak.
+  //
+  // This reads the selection rather than the event target: a keydown in a
+  // contenteditable targets the editor root, not the <li> the caret is in. The
+  // list item is then confirmed to be inside the composer, so a stale selection
+  // left somewhere else on the page (a transcript list, the sidebar) can't
+  // suppress the toggle. `[role="listitem"]` rides along in case a list renders
+  // as styled divs rather than real <li>s.
+  var LIST_ITEM_SEL = 'li, [role="listitem"]';
+
+  function caretInListItem() {
+    var sel = window.getSelection && window.getSelection();
+    if (!sel || !sel.anchorNode) return false;
+    var item = CPP.util.closestEl(sel.anchorNode, LIST_ITEM_SEL);
+    return !!item && CPP.util.closest(item, CPP.util.COMPOSER_SEL);
+  }
+
+  // Enter's editing job, done by us instead of by the key. Draft mode drops
+  // Enter outright — that's the whole promise, and a key handed to the editor in
+  // the hope that it consumes it is a submit one binding away — so while paused,
+  // Ctrl/⌘+Enter stands in: it breaks the line, and in a list that means the next
+  // item. Nothing is dispatched at the page; this is the browser's own editing
+  // command, which ProseMirror observes and folds into its document (the same
+  // path CPP.util.setComposerText falls back to).
+  //
+  // The caret is in the message box by the time we get here — the keydown came
+  // from it — so the command lands where the user is typing.
+  function insertBreak() {
+    try {
+      document.execCommand("insertParagraph");
+    } catch (err) {
+      /* an editor that won't take the command just gets no line break */
+    }
+  }
 
   // ---- tooltip rewrite ----------------------------------------------------
   // claude's tooltips are base-ui popups portaled to <body> with role="tooltip",
@@ -161,15 +213,17 @@
     if (e.isComposing) return;
 
     // Shift+Tab (bare — no other modifier) toggles the mode, but only from
-    // within the composer, so Shift+Tab keeps its normal focus-stepping job
-    // everywhere else on the page.
+    // within the composer and outside a list, so Shift+Tab keeps its normal
+    // focus-stepping job everywhere else on the page and its outdent job in
+    // lists.
     if (
       e.key === "Tab" &&
       e.shiftKey &&
       !e.ctrlKey &&
       !e.metaKey &&
       !e.altKey &&
-      CPP.util.inComposer(e.target)
+      CPP.util.inComposer(e.target) &&
+      !caretInListItem()
     ) {
       e.preventDefault(); // hold focus in the box instead of stepping back
       e.stopImmediatePropagation();
@@ -179,13 +233,18 @@
 
     if (!draftOn) return;
 
-    // In draft mode, plain Enter (and Ctrl/Cmd+Enter) must not submit. We drop
-    // it entirely rather than translate it, and leave Shift+Enter untouched so
-    // the app still inserts a newline — that's the intended way to add lines
-    // while drafting, and the DRAFT pill spells it out.
+    // In draft mode, plain Enter (and Ctrl/⌘+Enter) must not submit. Both are
+    // dropped before anything else in the page sees them. Shift+Enter is left
+    // untouched, so the app still inserts a line inside the current block.
+    //
+    // Ctrl/⌘+Enter then takes over Enter's editing job: it breaks the line, and
+    // in a list it starts the next item — the one thing Shift+Enter can't do,
+    // since it stays within the item. The key still never reaches the submit
+    // handler; the edit is made here instead.
     if (e.key === "Enter" && !e.shiftKey && CPP.util.closest(e.target, CPP.util.COMPOSER_SEL)) {
       e.preventDefault();
       e.stopImmediatePropagation();
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) insertBreak();
     }
   }
 

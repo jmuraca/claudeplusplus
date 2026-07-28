@@ -101,7 +101,7 @@
       id: "draft-mode",
       name: "Draft mode (Shift+Tab)",
       description:
-        "Press Shift+Tab in the message box to arm Draft mode: keep typing, attaching files, dictating, and switching models freely, with no way to submit by accident. The Send button turns into a blue Pause; press Shift+Tab again (or click it) to return to normal. Shift+Enter still inserts a newline.",
+        "Press Shift+Tab in the message box to arm Draft mode: keep typing, attaching files, dictating, and switching models freely, with no way to submit by accident. The Send button turns into a blue Pause; press Shift+Tab again (or click it) to return to normal. No Enter submits while paused: Shift+Enter still inserts a newline, and Ctrl/⌘+Enter breaks the line in its place — which inside a list starts the next item. Tab and Shift+Tab keep indenting and outdenting list items.",
       defaultEnabled: true
     },
     {

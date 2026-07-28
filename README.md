@@ -219,6 +219,14 @@ button) to return to normal.
   is neutralized the same way, since draft mode is a text-only feature.
 - The hover tooltip on those buttons is retitled while draft mode is on, and the state
   resets to normal when you switch chats.
+- **No Enter submits while paused** — plain or with Ctrl/⌘, in a list or out of it. Instead,
+  **Ctrl/⌘+Enter** takes over Enter's editing job: it breaks the line, which inside a list
+  means the **next list item**. (Shift+Enter still adds a line *within* the current item, as
+  it always has.) The key never reaches claude's submit handler; the line break is inserted
+  directly, so drafting a bulleted list works without ever arming the send path.
+- **Tab and Shift+Tab keep their list jobs**: Tab indents an item, Shift+Tab outdents one.
+  Since Shift+Tab is the outdent inside a list, the mode toggle stands down there — move the
+  caret out of the list to switch modes, or click the blue Pause.
 
 ### 😀 Emoji autocomplete
 Slack-style emoji in the message box, driven off what you type between colons.

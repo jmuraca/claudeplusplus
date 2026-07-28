@@ -53,12 +53,6 @@ function harness() {
         return (el && el.closest && el.closest(sel)) || null;
       },
       closest: (node, sel) => !!window.CPP.util.closestEl(node, sel),
-      // Mirrors core.js. jsdom has no innerText, so this exercises the
-      // textContent branch; the newline-preserving one only exists in a browser.
-      plainText: (el) =>
-        (el ? (el.innerText != null ? el.innerText : el.textContent || "") : "")
-          .replace(/​/g, "")
-          .trim(),
       inComposer: (node) =>
         window.CPP.util.closest(node, window.CPP.util.COMPOSER_SEL) ||
         window.CPP.util.closest(document.activeElement, window.CPP.util.COMPOSER_SEL)

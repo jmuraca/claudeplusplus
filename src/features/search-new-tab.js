@@ -40,7 +40,7 @@
   };
 
   // Item ids are uuids or "session_<base62>". Anything else is refused rather
-  // than pasted into a URL or a selector.
+  // than pasted into a URL.
   var SAFE_ID = /^[A-Za-z0-9_-]+$/;
 
   var started = false;

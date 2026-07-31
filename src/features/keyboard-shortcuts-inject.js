@@ -19,16 +19,15 @@
   var ATTR = "data-cpp-shortcut";
   var DIALOG_SEL = '[role="dialog"]';
 
-  // The accelerator these shortcuts are actually bound to on this machine.
-  // prompt-stash answers to ⌘S on a Mac and labels its own card that way, so a
-  // dialog row reading "Ctrl S" there names a chord that does nothing.
-  var ACCEL = CPP.util.IS_MAC ? "⌘" : "Ctrl";
-
+  // CPP.util.ACCEL is the accelerator these shortcuts are actually bound to on
+  // this machine. prompt-stash answers to ⌘S on a Mac and labels its own card
+  // that way, so a dialog row reading "Ctrl S" there names a chord that does
+  // nothing.
   var SHORTCUTS = [
     { label: "Previous message", keys: ["Alt", "↑"] },
     { label: "Next message", keys: ["Alt", "↓"] },
     { label: "Draft mode", keys: ["Shift", "Tab"] },
-    { label: "Stash prompt", keys: [ACCEL, "S"] }
+    { label: "Stash prompt", keys: [CPP.util.ACCEL, "S"] }
   ];
 
   // Build one shortcut row matching claude's own markup.

@@ -8,23 +8,14 @@
 // real grid is only ever hidden, never unmounted, since a control React has
 // dropped can't be clicked.
 //
-// CPP is stubbed rather than loaded: core.js wants chrome.* and the storage-sync
-// module, and none of that is under test here.
+// CPP is the real one (see test/cpp.js), with storage stubbed per test.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const { JSDOM } = require("jsdom");
+const { loadCPP, run, source } = require("./cpp");
 
-const SOURCE = fs.readFileSync(
-  path.join(__dirname, "..", "src", "features", "project-files-view.js"),
-  "utf8"
-);
-
-const PROJECT_FILES = fs.readFileSync(
-  path.join(__dirname, "..", "src", "project-files.js"),
-  "utf8"
-);
+const SOURCE = source("src", "features", "project-files-view.js");
+const PROJECT_FILES = source("src", "project-files.js");
 
 const PROJECT = "42028720-ea8b-49d9-8881-9a33822f6a71";
 const ALPHA_ID = "1ad752ce-36bd-4836-9015-f50d300c870b";
@@ -113,36 +104,24 @@ async function harness(opts) {
     }
   };
 
-  window.CPP = {
-    util: {
-      currentProjectId: () => PROJECT,
-      // Mirrors core.js.
-      plainText: (el) =>
-        (el ? (el.innerText != null ? el.innerText : el.textContent || "") : "")
-          .replace(/​/g, "")
-          .trim(),
-      get: () =>
-        Promise.resolve(
-          opts.stored ? { cppProjectFilesView: opts.stored } : {}
-        ),
-      set: (obj) => {
-        log.saved.push(obj);
-        return Promise.resolve();
-      }
-    },
-    scheduleApply() {
-      log.applies++;
-    },
-    registerFeature(f) {
-      this.feature = f;
+  // Storage is stubbed rather than left to core's wrappers, since what the view
+  // reads back and what it saves are both under test here. plainText is core's
+  // own.
+  const CPP = loadCPP(window, {
+    currentProjectId: () => PROJECT,
+    get: () => Promise.resolve(opts.stored ? { cppProjectFilesView: opts.stored } : {}),
+    set: (obj) => {
+      log.saved.push(obj);
+      return Promise.resolve();
     }
+  });
+  CPP.scheduleApply = () => {
+    log.applies++;
   };
 
-  // Run the content script the way the manifest does: as a script in the page,
-  // so its bare `window`/`document`/`CPP` resolve to this document's.
-  new window.Function(PROJECT_FILES).call(window);
-  new window.Function(SOURCE).call(window);
-  const feature = window.CPP.feature;
+  run(window, PROJECT_FILES);
+  run(window, SOURCE);
+  const feature = CPP.feature;
   feature.onInit(window.CPP);
 
   const settle = async () => {

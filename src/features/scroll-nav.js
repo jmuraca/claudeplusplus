@@ -38,6 +38,7 @@
 
   var TOP_OFFSET = 12; // px of breathing room above a message we land on
   var MOUNT_WAIT = 48; // ms a jump first waits on the virtualizer, then backs off
+  var MAX_PASSES = 18; // converging passes before a jump gives up and goes back
   var Z = 2147482990; // just under the asides popover layer
 
   // Icons are Anthropicons glyphs (see CPP.util.ICON). The far-jump pair reads
@@ -180,10 +181,9 @@
   // one exception is a bracket that closes on nothing while we're pinned against
   // the end the missing turn would be past — pressing "next" on the last message
   // belongs at the bottom, and "prev" on the first belongs at the top.
-  function seekToTop(idx, smooth, tries) {
+  function seekToTop(idx) {
     var sc = scrollerEl();
     if (!sc) return;
-    if (tries === undefined) tries = 18;
 
     var mine = ++seekId;
     var origin = sc.scrollTop;
@@ -204,7 +204,7 @@
     function align(el) {
       var scRect = sc.getBoundingClientRect();
       var target = sc.scrollTop + (el.getBoundingClientRect().top - scRect.top) - TOP_OFFSET;
-      sc.scrollTo({ top: Math.max(0, target), behavior: smooth ? "smooth" : "auto" });
+      sc.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
       done();
     }
 
@@ -241,7 +241,7 @@
       if (mine !== seekId) return; // a newer jump took over
       var el = articleFor(idx);
       if (el) { align(el); return; }
-      if (++pass > tries) { sc.scrollTop = origin; done(); return; }
+      if (++pass > MAX_PASSES) { sc.scrollTop = origin; done(); return; }
 
       var m = mountedRange();
       var w = m && placed(m);
@@ -313,7 +313,7 @@
     }
     if (target === null) target = cur - 2; // alternation: previous user turn
     if (target < 0) { goTop(); return; }
-    seekToTop(target, true);
+    seekToTop(target);
   }
 
   function goNextUser() {
@@ -329,7 +329,7 @@
       }
       if (target === null) target = cur + 2; // alternation: next user turn
     }
-    seekToTop(target, true);
+    seekToTop(target);
   }
 
   // ---------- keyboard ----------

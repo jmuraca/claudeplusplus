@@ -7,20 +7,14 @@
 // Discard buttons in a row gets pressed, and that a sent message in the
 // transcript — same bubble attribute, different place — is never touched.
 //
-// CPP is stubbed rather than loaded: core.js wants chrome.* and the storage-sync
-// module, and none of that is under test here. The stub records what the feature
-// asked for so the order of operations can be asserted, which matters — the
-// composer has to be written before the queue is touched.
+// CPP is the real one (see test/cpp.js), with the composer reads and writes
+// overridden to record what the feature asked for — the order of operations
+// matters here, since the composer has to be written before the queue is
+// touched, and a recorder is the only way to see it.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const { JSDOM } = require("jsdom");
-
-const SOURCE = fs.readFileSync(
-  path.join(__dirname, "..", "src", "features", "queue-edit.js"),
-  "utf8"
-);
+const { loadFeature } = require("./cpp");
 
 const PAGE = `
 <div class="relative flex flex-col items-end" data-testid="pending-queue-row">
@@ -73,40 +67,21 @@ function harness() {
   const editor = document.querySelector('[contenteditable="true"]');
   const log = { composer: "", writes: [], discarded: [] };
 
-  window.CPP = {
-    util: {
-      composerEditor: () => editor,
-      // Mirrors core.js: an event target is often a text node, which a bare
-      // Element.closest can't be called on.
-      closestEl: (node, sel) => {
-        const el = node && node.nodeType === 1 ? node : node && node.parentElement;
-        return (el && el.closest && el.closest(sel)) || null;
-      },
-      // Mirrors core.js. jsdom has no innerText, so this exercises the
-      // textContent branch; the newline-preserving one only exists in a browser.
-      plainText: (el) =>
-        (el ? (el.innerText != null ? el.innerText : el.textContent || "") : "")
-          .replace(/\u200b/g, "")
-          .trim(),
-      composerText: () => log.composer,
-      setComposerText: (text) => {
-        log.composer = text;
-        log.writes.push(text);
-      }
-    },
-    registerFeature(f) {
-      this.feature = f;
-    }
-  };
-
   document
     .querySelectorAll("button[aria-label]")
     .forEach((b) => b.addEventListener("click", () => log.discarded.push(b.id)));
 
-  // Run the content script the way the manifest does: as a script in the page,
-  // so its bare `window`/`document`/`CPP` references resolve to this document's.
-  new window.Function(SOURCE).call(window);
-  const feature = window.CPP.feature;
+  // Only the composer is stubbed: real writes go through a paste event into a
+  // ProseMirror that isn't here. Note plainText is core's own, and in jsdom it
+  // takes the textContent branch \u2014 innerText exists only in a browser.
+  const feature = loadFeature(window, "features/queue-edit.js", {
+    composerEditor: () => editor,
+    composerText: () => log.composer,
+    setComposerText: (text) => {
+      log.composer = text;
+      log.writes.push(text);
+    }
+  });
   feature.onInit();
   feature.onApply();
 

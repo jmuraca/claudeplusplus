@@ -116,8 +116,7 @@
 
   /** Streaming messages append text continuously, so offsets taken mid-stream drift. */
   function isSettled(node) {
-    var el = node && node.nodeType === 1 ? node : node && node.parentElement;
-    var wrap = el && el.closest("[data-is-streaming]");
+    var wrap = CPP.util.closestEl(node, "[data-is-streaming]");
     return !wrap || wrap.dataset.isStreaming === "false";
   }
 

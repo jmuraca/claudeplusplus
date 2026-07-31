@@ -21,14 +21,8 @@
 // of the chat.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const { JSDOM } = require("jsdom");
-
-const SOURCE = fs.readFileSync(
-  path.join(__dirname, "..", "src", "features", "scroll-nav.js"),
-  "utf8"
-);
+const { loadFeature } = require("./cpp");
 
 const VIEW = 800; // scroller height
 const OVERSCAN = 200; // px kept mounted either side of the viewport
@@ -165,16 +159,7 @@ function harness(opts) {
     });
   }
 
-  window.CPP = {
-    util: {
-      ICON: { ARROW_BAR_LEFT: 1, CHEVRON_UP: 2, CHEVRON_DOWN: 3, ARROW_BAR_RIGHT: 4 },
-      icon: function () { return document.createElement("span"); }
-    },
-    registerFeature: function (f) { this.feature = f; }
-  };
-
-  new window.Function(SOURCE).call(window);
-  const feature = window.CPP.feature;
+  const feature = loadFeature(window, "features/scroll-nav.js");
   feature.onInit();
 
   const press = function (key) {

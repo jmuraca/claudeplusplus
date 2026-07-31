@@ -74,20 +74,17 @@
 
   // ---------- opening it ----------
 
-  // The platform's "open this elsewhere" modifier. Reading both Ctrl and ⌘
-  // everywhere would misfire on macOS, where Ctrl+click is the secondary click:
-  // the user is asking for the context menu, and we'd hand them a tab instead.
-  function accelHeld(e) {
-    return CPP.util.IS_MAC ? !!e.metaKey : !!e.ctrlKey;
-  }
-
-  // Which gesture, if any, means "not in this tab". Alt is excluded: Chrome
-  // reads Alt+click as a download, which isn't ours to reinterpret.
+  // Which gesture, if any, means "not in this tab". CPP.util.accel is the
+  // platform's "open this elsewhere" modifier, and it matters here that it is
+  // strict about which key: on macOS Ctrl+click is the secondary click, so
+  // answering it with a tab takes the context menu away from the user. Alt is
+  // excluded too — Chrome reads Alt+click as a download, which isn't ours to
+  // reinterpret.
   function wantsNewTab(e) {
     if (e.altKey) return false;
     if (e.button === 1) return true; // middle-click
     if (e.button !== 0) return false; // right, back, forward
-    return accelHeld(e);
+    return CPP.util.accel(e);
   }
 
   // Open `href` away from this tab, leaving the choice of *where* to the
@@ -152,7 +149,7 @@
   // hint on the highlighted row, and this is that row in a new tab.
   function onKeydown(e) {
     if (e.isComposing || e.key !== "Enter" || e.altKey) return;
-    if (!accelHeld(e)) return;
+    if (!CPP.util.accel(e)) return;
     var item = selectedItem();
     if (!item) return;
     var href = hrefFor(item);

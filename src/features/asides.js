@@ -898,8 +898,7 @@
 
   var OURS = ".cpa-gutter, .cpa-popover, .cpa-layer, [data-cpa-ask]";
   function isOurs(node) {
-    var el = node && node.nodeType === 1 ? node : node && node.parentElement;
-    return !!(el && el.closest(OURS));
+    return CPP.util.closest(node, OURS);
   }
 
   /** Clicking a highlight opens its aside — the entry point back into a thread. */

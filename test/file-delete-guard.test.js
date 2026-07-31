@@ -10,19 +10,11 @@
 // out through claude's own control, not through anything we do ourselves.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const { JSDOM } = require("jsdom");
+const { loadCPP, run, source } = require("./cpp");
 
-const SOURCE = fs.readFileSync(
-  path.join(__dirname, "..", "src", "features", "file-delete-guard.js"),
-  "utf8"
-);
-
-const PROJECT_FILES = fs.readFileSync(
-  path.join(__dirname, "..", "src", "project-files.js"),
-  "utf8"
-);
+const SOURCE = source("src", "features", "file-delete-guard.js");
+const PROJECT_FILES = source("src", "project-files.js");
 
 const PAGE = `
 <div class="w-full px-[1.375rem] py-4 flex flex-col gap-2 mb-1" id="panel">
@@ -87,30 +79,15 @@ function harness() {
     if (el) reached.push(el.id);
   });
 
-  window.CPP = {
-    util: {
-      currentProjectId: () => "42028720-ea8b-49d9-8881-9a33822f6a71",
-      // Mirrors core.js.
-      labelOf: (el) =>
-        (
-          (el.getAttribute("aria-label") || "") + " " +
-          (el.getAttribute("title") || "") + " " +
-          (el.textContent || "")
-        ).toLowerCase(),
-      OUR_UI: "[data-cpp]",
-      plainText: (el) =>
-        (el ? (el.innerText != null ? el.innerText : el.textContent || "") : "")
-          .replace(/​/g, "")
-          .trim()
-    },
-    registerFeature(f) {
-      this.feature = f;
-    }
-  };
+  // The fixture is a project panel without a project URL, so only the id is
+  // stubbed; labelOf, OUR_UI and plainText are core's own.
+  const CPP = loadCPP(window, {
+    currentProjectId: () => "42028720-ea8b-49d9-8881-9a33822f6a71"
+  });
 
-  new window.Function(PROJECT_FILES).call(window);
-  new window.Function(SOURCE).call(window);
-  const feature = window.CPP.feature;
+  run(window, PROJECT_FILES);
+  run(window, SOURCE);
+  const feature = CPP.feature;
   feature.onInit(window.CPP);
 
   const $ = (id) => document.getElementById(id);

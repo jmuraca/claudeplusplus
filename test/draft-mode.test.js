@@ -8,19 +8,12 @@
 // browser steps focus backwards). The fixture composer therefore holds both a
 // plain paragraph and a list, and the tests move the caret between them.
 //
-// CPP is stubbed rather than loaded: core.js wants chrome.* and the storage-sync
-// module, and none of that is under test here. The util functions below mirror
-// core.js closely enough that the feature can't tell the difference.
+// CPP is the real one (see test/cpp.js), so the composer test the feature keys
+// off is core's own.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const { JSDOM } = require("jsdom");
-
-const SOURCE = fs.readFileSync(
-  path.join(__dirname, "..", "src", "features", "draft-mode.js"),
-  "utf8"
-);
+const { loadFeature } = require("./cpp");
 
 const PAGE = `
 <ul class="transcript"><li id="sent-item">a list in a sent message</li></ul>
@@ -43,27 +36,7 @@ function harness() {
 
   const editor = document.querySelector('[contenteditable="true"]');
 
-  window.CPP = {
-    util: {
-      COMPOSER_SEL: '[data-chat-input-container], [data-testid="chat-input"]',
-      // Mirrors core.js: an event target is often a text node, which a bare
-      // Element.closest can't be called on.
-      closestEl: (node, sel) => {
-        const el = node && node.nodeType === 1 ? node : node && node.parentElement;
-        return (el && el.closest && el.closest(sel)) || null;
-      },
-      closest: (node, sel) => !!window.CPP.util.closestEl(node, sel),
-      inComposer: (node) =>
-        window.CPP.util.closest(node, window.CPP.util.COMPOSER_SEL) ||
-        window.CPP.util.closest(document.activeElement, window.CPP.util.COMPOSER_SEL)
-    },
-    registerFeature(f) {
-      this.feature = f;
-    }
-  };
-
-  new window.Function(SOURCE).call(window);
-  const feature = window.CPP.feature;
+  const feature = loadFeature(window, "features/draft-mode.js");
   feature.onInit();
 
   // Put the caret inside `el` the way a click would, so the feature's selection

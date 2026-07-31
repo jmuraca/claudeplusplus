@@ -3,7 +3,7 @@
   "private": true,
   "description": "Tooling for the Claude++ Chrome extension. The extension ships no dependencies and is loaded straight from source; this exists only so the tests have a DOM to run against.",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test \"test/*.test.js\""
   },
   "devDependencies": {
     "jsdom": "^27.0.0"

@@ -97,6 +97,16 @@
     }
   }
 
+  // True on Apple keyboards, where the modifier conventions are not the ones the
+  // rest of the world uses: ⌘ is the accelerator (⌘+click opens a link in a new
+  // tab), while Ctrl+click is the secondary click that opens the context menu. A
+  // feature that reads Ctrl as an accelerator without checking this fires on a
+  // gesture the user aimed at the menu. Read once — the keyboard doesn't change
+  // under a page.
+  var IS_MAC = /Mac|iP(hone|ad|od)/.test(
+    (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || ""
+  );
+
   var util = {
     UUID_G: new RegExp(UUID, "gi"),
     PROJECT_RE: new RegExp("/project/(" + UUID + ")", "i"),
@@ -166,16 +176,32 @@
       return !!util.closestEl(node, sel);
     },
 
-    // True on Apple keyboards, where the modifier conventions are not the ones
-    // the rest of the world uses: ⌘ is the accelerator (⌘+click opens a link in
-    // a new tab), while Ctrl+click is the secondary click that opens the context
-    // menu. A feature that reads Ctrl as an accelerator without checking this
-    // fires on a gesture the user aimed at the menu.
-    IS_MAC: /Mac|iP(hone|ad|od)/.test(
-      (navigator.userAgentData && navigator.userAgentData.platform) ||
-        navigator.platform ||
-        ""
-    ),
+    // ---- the accelerator --------------------------------------------------
+    // Which physical modifier means "do the bigger version of this" differs by
+    // platform (see IS_MAC above), and three things follow from it: whether a
+    // gesture counts, what to call it, and how to punctuate it. All three live
+    // here, so a feature never has to ask the platform itself.
+    IS_MAC: IS_MAC,
+
+    // Is the accelerator held? Strict about which key, on purpose: reading Ctrl
+    // and ⌘ as interchangeable misfires on macOS, where Ctrl+click is the
+    // secondary click — the user is asking for the context menu and would get a
+    // new tab instead. A keydown can afford to be lenient, since Ctrl+<key>
+    // collides with nothing there; a pointer gesture cannot, and shouldn't have
+    // to remember that on its own.
+    accel: function (e) {
+      return util.IS_MAC ? !!e.metaKey : !!e.ctrlKey;
+    },
+
+    // The accelerator as a keycap on its own, for chrome that draws one chip per
+    // key ("⌘" / "Ctrl").
+    ACCEL: IS_MAC ? "⌘" : "Ctrl",
+
+    // The same chord written out, for chrome that says it in a line of text. The
+    // two platforms don't punctuate it alike: "⌘S", but "Ctrl+S".
+    chord: function (key) {
+      return util.IS_MAC ? "⌘" + key : "Ctrl+" + key;
+    },
 
     // The composer's contenteditable, or null when it isn't mounted. Candidates
     // are tried most-specific first.

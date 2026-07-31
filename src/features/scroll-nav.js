@@ -37,6 +37,8 @@
   var USER_MSG = '[data-testid="user-message"]';
 
   var TOP_OFFSET = 12; // px of breathing room above a message we land on
+  var MOUNT_WAIT = 48; // ms a jump first waits on the virtualizer, then backs off
+  var MAX_PASSES = 18; // converging passes before a jump gives up and goes back
   var Z = 2147482990; // just under the asides popover layer
 
   // Icons are Anthropicons glyphs (see CPP.util.ICON). The far-jump pair reads
@@ -59,19 +61,45 @@
   var bar = null; // toolbar element
   var boundScroller = null; // scroller we've attached the scroll listener to
   var started = false;
+  var seekId = 0; // bumps on every jump so an in-flight seek stops stepping
+  var seeking = null; // the turn a jump is converging on, while it converges
 
   // ---------- DOM helpers ----------
+  // Every [data-rs-index] lookup is scoped to the feed. The index is a position
+  // in one virtualized list, so a row from any other list on the page — and
+  // claude.ai virtualizes more than the transcript — is a different list's row
+  // wearing the same number.
 
   function scrollerEl() {
     return document.querySelector(SCROLLER);
   }
 
+  function feedEl() {
+    return document.querySelector(FEED);
+  }
+
+  // A turn the virtualizer has retired but kept in the tree — and one it has
+  // just mounted but not yet placed — still answers a query, while reporting an
+  // empty box at the origin. Counted as present it reads as a turn sitting at
+  // the very top of the transcript, so a row we can't measure counts as not
+  // there at all: unmounted is exactly what it is, and the seek below already
+  // knows how to reach an unmounted turn.
+  function boxOf(el) {
+    if (!el) return null;
+    var r = el.getBoundingClientRect();
+    return r.width || r.height ? r : null;
+  }
+
   function articleFor(idx) {
-    return document.querySelector('[data-rs-index="' + idx + '"]');
+    var feed = feedEl();
+    var el = feed && feed.querySelector('[data-rs-index="' + idx + '"]');
+    return boxOf(el) ? el : null;
   }
 
   function mountedArticles() {
-    return Array.prototype.slice.call(document.querySelectorAll(ARTICLE));
+    var feed = feedEl();
+    if (!feed) return [];
+    return Array.prototype.filter.call(feed.querySelectorAll(ARTICLE), boxOf);
   }
 
   function isUserArticle(a) {
@@ -94,6 +122,12 @@
   // the viewport top). Using that line, not the raw viewport top, is what makes
   // "next" advance off a turn we just landed on rather than treating it as still
   // ahead of us. Returns null when the view sits above the first user turn.
+  //
+  // "Last" is decided by where the turns actually sit, not by their index: a row
+  // the virtualizer has just mounted but not yet placed reads as sitting at the
+  // very top of the list, and picking it by index would hand back a turn from
+  // far down the chat as the one we're on — which then sends next/prev off to
+  // wherever that turn lives.
   function currentUserIndex() {
     var sc = scrollerEl();
     if (!sc) return null;
@@ -101,13 +135,11 @@
     var best = null;
     mountedArticles().forEach(function (a) {
       if (!isUserArticle(a)) return;
-      var top = a.getBoundingClientRect().top;
-      if (top <= anchorY) {
-        var idx = +a.dataset.rsIndex;
-        if (best === null || idx > best) best = idx;
-      }
+      var top = boxOf(a).top;
+      if (top > anchorY) return;
+      if (best === null || top > best.top) best = { top: top, idx: +a.dataset.rsIndex };
     });
-    return best;
+    return best === null ? null : best.idx;
   }
 
   // Mounted user-turn indices, ascending — used to prefer an exact neighbour
@@ -122,38 +154,117 @@
   // ---------- seeking ----------
 
   // Align turn `idx` near the top of the viewport. If it's already mounted we
-  // scroll straight to it; otherwise we estimate its position from the mounted
-  // rows, jump, let the virtualizer mount what lands there, and converge.
-  function seekToTop(idx, smooth, tries) {
+  // scroll straight to it; otherwise we jump to an estimate of where it is, let
+  // the virtualizer mount whatever lands there, and converge.
+  //
+  // An estimate is an average row height taken across the mounted window, and
+  // one long answer in that window makes it a bad predictor of the short turns
+  // below — a single pass can overshoot the rest of the transcript, where the
+  // scroller clamps at the bottom. So the loop also keeps a bracket of the
+  // scroll positions the turn can still be at, and every pass narrows it: the
+  // mounted window is a contiguous run of turns around the viewport, so a window
+  // sitting entirely above the turn we want proves the turn is further down than
+  // here, and one entirely below proves it is further up. An estimate outside
+  // the bracket is replaced by the bracket's midpoint, which halves the search
+  // rather than trusting an average that has already been wrong once.
+  //
+  // What the bracket must not be narrowed by is a window measured before the
+  // virtualizer has caught up with the last jump: those are the old rows in
+  // their new positions — still contiguous, still numbered, and now nowhere near
+  // the viewport. Believed, they rule out the very ground the turn is standing
+  // on. A window that doesn't touch the viewport is not evidence, so the pass
+  // waits for the next one instead. Waiting is also all a slow mount costs:
+  // passes back off rather than reading a re-render that hasn't happened yet as
+  // proof that the turn can't be reached.
+  //
+  // A seek that runs out of passes puts the reader back where they started. The
+  // one exception is a bracket that closes on nothing while we're pinned against
+  // the end the missing turn would be past — pressing "next" on the last message
+  // belongs at the bottom, and "prev" on the first belongs at the top.
+  function seekToTop(idx) {
     var sc = scrollerEl();
     if (!sc) return;
-    if (tries === undefined) tries = 14;
+
+    var mine = ++seekId;
+    var origin = sc.scrollTop;
+    // The bracket holds what the passes have proved, not how tall the transcript
+    // is: a virtualized list only knows the height of what it has measured, so
+    // the end of it moves as rows mount. The live end is applied on top, each
+    // pass, as a limit on where we can actually scroll.
+    var lo = 0; // nearest scroll position the turn can still be at
+    var hi = Infinity; // furthest
+    var pass = 0;
+
+    seeking = { id: mine, idx: idx };
+
+    function done() {
+      if (seeking && seeking.id === mine) seeking = null;
+    }
 
     function align(el) {
       var scRect = sc.getBoundingClientRect();
       var target = sc.scrollTop + (el.getBoundingClientRect().top - scRect.top) - TOP_OFFSET;
-      sc.scrollTo({ top: Math.max(0, target), behavior: smooth ? "smooth" : "auto" });
+      sc.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
+      done();
     }
 
-    function step() {
-      var el = articleFor(idx);
-      if (el) { align(el); return; }
-      if (--tries <= 0) return;
-
-      var m = mountedRange();
-      var first = m && articleFor(m.lo);
-      var last = m && articleFor(m.hi);
-      if (!first || !last || m.hi === m.lo) return;
-
+    // The mounted window, measured, but only while it's the window belonging to
+    // where we are now — see above.
+    function placed(m) {
+      var first = articleFor(m.lo);
+      var last = articleFor(m.hi);
+      if (!first || !last) return null;
       var fr = first.getBoundingClientRect();
       var lr = last.getBoundingClientRect();
       var sr = sc.getBoundingClientRect();
-      var avg = Math.max(1, (lr.bottom - fr.top) / (m.hi - m.lo + 1));
+      if (lr.bottom < sr.top || fr.top > sr.bottom) return null;
+      return { fr: fr, lr: lr, sr: sr };
+    }
 
-      var before = sc.scrollTop;
-      sc.scrollTop += fr.top - sr.top + (idx - m.lo) * avg - TOP_OFFSET;
-      if (Math.abs(sc.scrollTop - before) < 1) return;
-      requestAnimationFrame(step);
+    function estimate(m, w) {
+      var avg = Math.max(1, (w.lr.bottom - w.fr.top) / (m.hi - m.lo + 1));
+      return sc.scrollTop + (w.fr.top - w.sr.top) + (idx - m.lo) * avg - TOP_OFFSET;
+    }
+
+    function noSuchTurn(below) {
+      // Only the end the turn would be past counts: overshooting to the bottom
+      // while hunting a turn behind us is a bad estimate, not the end of the
+      // chat, and leaving the reader there is the whole complaint.
+      var atEnd = below
+        ? sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 1
+        : sc.scrollTop <= 1;
+      if (!atEnd) sc.scrollTop = origin;
+      done();
+    }
+
+    function step() {
+      if (mine !== seekId) return; // a newer jump took over
+      var el = articleFor(idx);
+      if (el) { align(el); return; }
+      if (++pass > MAX_PASSES) { sc.scrollTop = origin; done(); return; }
+
+      var m = mountedRange();
+      var w = m && placed(m);
+      if (w && (idx > m.hi || idx < m.lo)) {
+        var below = idx > m.hi;
+        var here = sc.scrollTop;
+        if (below) lo = Math.max(lo, here + 1);
+        else hi = Math.min(hi, here - 1);
+
+        // The bracket, as far as the scroller can currently be scrolled. Nothing
+        // left inside it means no scroll position shows that turn at the top.
+        var near = lo;
+        var far = Math.min(hi, Math.max(0, sc.scrollHeight - sc.clientHeight));
+        if (near > far) { noSuchTurn(below); return; }
+
+        // Either edge is on the far side of where we are, so a position inside
+        // the bracket is always a move in the right direction.
+        var next = estimate(m, w);
+        if (next < near || next > far) next = (near + far) / 2;
+        sc.scrollTop = next;
+      }
+
+      setTimeout(step, Math.min(MOUNT_WAIT * 5, MOUNT_WAIT + 16 * pass));
     }
 
     step();
@@ -161,33 +272,55 @@
 
   // ---------- actions ----------
 
+  // The two far jumps also stop any seek still converging, so a slow one can't
+  // haul the reader back off the end they just asked for.
   function goTop() {
     var sc = scrollerEl();
+    seekId++;
+    seeking = null;
     if (sc) sc.scrollTo({ top: 0, behavior: "auto" });
   }
 
   function goBottom() {
     var sc = scrollerEl();
+    seekId++;
+    seeking = null;
     if (sc) sc.scrollTo({ top: sc.scrollHeight, behavior: "auto" });
   }
 
+  // Which turn a step starts from. Held keys and quick repeats arrive while the
+  // last jump is still converging, and the transcript is then parked partway
+  // between turns — reading the view would step from wherever that happens to
+  // be, so a press mid-jump steps on from the turn the jump is heading to.
+  //
+  // Only a turn read from the view has the mounted window around it, so that's
+  // also what says whether the exact neighbour is there to be used: mid-jump the
+  // window is around the ground the search is crossing, where the nearest user
+  // turn is no relation of the one we're stepping from.
+  function stepFrom() {
+    if (seeking) return { idx: seeking.idx, live: false };
+    return { idx: currentUserIndex(), live: true };
+  }
+
   function goPrevUser() {
-    var cur = currentUserIndex();
+    var from = stepFrom();
+    var cur = from.idx;
     if (cur === null) { goTop(); return; } // already above the first question
-    var mounted = mountedUserIndices();
+    var mounted = from.live ? mountedUserIndices() : [];
     var target = null;
     for (var i = mounted.length - 1; i >= 0; i--) {
       if (mounted[i] < cur) { target = mounted[i]; break; }
     }
     if (target === null) target = cur - 2; // alternation: previous user turn
     if (target < 0) { goTop(); return; }
-    seekToTop(target, true);
+    seekToTop(target);
   }
 
   function goNextUser() {
-    var cur = currentUserIndex();
+    var from = stepFrom();
+    var cur = from.idx;
     var target = null;
-    var mounted = mountedUserIndices();
+    var mounted = from.live ? mountedUserIndices() : [];
     if (cur === null) {
       target = mounted.length ? mounted[0] : 0; // first question
     } else {
@@ -196,7 +329,7 @@
       }
       if (target === null) target = cur + 2; // alternation: next user turn
     }
-    seekToTop(target, true);
+    seekToTop(target);
   }
 
   // ---------- keyboard ----------
@@ -304,6 +437,8 @@
 
     onTeardown: function () {
       started = false;
+      seekId++; // strand any seek still converging
+      seeking = null;
       window.removeEventListener("keydown", onKeydown, true);
       if (boundScroller) {
         boundScroller.removeEventListener("scroll", onScroll);

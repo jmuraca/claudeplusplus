@@ -241,6 +241,11 @@
     // in a list it starts the next item — the one thing Shift+Enter can't do,
     // since it stays within the item. The key still never reaches the submit
     // handler; the edit is made here instead.
+    //
+    // Either modifier is accepted, not CPP.util.accel's platform-strict one: the
+    // key that submits on claude.ai is Enter itself, so both are already off the
+    // submit path by the time we get here, and answering both means the hand
+    // that reaches for the wrong one still gets its line break.
     if (e.key === "Enter" && !e.shiftKey && CPP.util.closest(e.target, CPP.util.COMPOSER_SEL)) {
       e.preventDefault();
       e.stopImmediatePropagation();

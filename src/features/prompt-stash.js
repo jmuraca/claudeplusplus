@@ -42,7 +42,7 @@
   var GAP = 16; // between the card and the composer
   var EDGE = 12; // keep the card this far from the viewport edge
 
-  var CHORD = CPP.util.IS_MAC ? "⌘S" : "Ctrl+S";
+  var CHORD = CPP.util.chord("S");
 
   var ctx = null;
   var started = false;
@@ -255,6 +255,11 @@
   function onKeydownCapture(e) {
     // Mid-IME-composition an "s" is candidate text, not a shortcut.
     if (e.isComposing) return;
+    // Either modifier, deliberately — not CPP.util.accel, which is strict about
+    // which one. Strictness is there to keep a Mac's Ctrl+click (the secondary
+    // click) from being read as an accelerator, and no such gesture is at stake
+    // on a keydown: Ctrl+S on a Mac means nothing to the browser or the page, so
+    // a hand that reaches for it gets the stash rather than nothing.
     if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
     if (e.key !== "s" && e.key !== "S") return;
     if (!CPP.util.inComposer(e.target)) return;

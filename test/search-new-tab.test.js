@@ -11,14 +11,8 @@
 // anchor's href/target/modifiers are exactly what a browser would act on.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const { JSDOM } = require("jsdom");
-
-const SOURCE = fs.readFileSync(
-  path.join(__dirname, "..", "src", "features", "search-new-tab.js"),
-  "utf8"
-);
+const { loadFeature } = require("./cpp");
 
 const CHAT_ID = "cb09feaf-e5ce-40fb-aaf7-24c706e9c23e";
 const SESSION_ID = "session_01YLTznKURuSxY437sYYKfXT";
@@ -91,25 +85,11 @@ function harness(opts) {
     if (row) navigated.push(row.id);
   });
 
-  window.CPP = {
-    util: {
-      IS_MAC: mac,
-      // Mirrors core.js: an event target is often a text node, which a bare
-      // Element.closest can't be called on.
-      closestEl: (node, sel) => {
-        const el = node && node.nodeType === 1 ? node : node && node.parentElement;
-        return (el && el.closest && el.closest(sel)) || null;
-      }
-    },
-    registerFeature(f) {
-      this.feature = f;
-    }
-  };
-
-  // Run the content script the way the manifest does: as a script in the page,
-  // so its bare `window`/`document`/`CPP` references resolve to this document's.
-  new window.Function(SOURCE).call(window);
-  const feature = window.CPP.feature;
+  // The one thing a jsdom window can't be asked: which keyboard it has. Core
+  // reads the platform once at load, and CPP.util.accel — the predicate the
+  // feature calls — reads IS_MAC off util each time, so overriding it here is
+  // enough to test both platforms against the real accelerator rule.
+  const feature = loadFeature(window, "features/search-new-tab.js", { IS_MAC: mac });
   feature.onInit();
 
   const row = (id) => document.getElementById("command-palette-item-" + id);

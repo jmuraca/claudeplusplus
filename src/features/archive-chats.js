@@ -80,7 +80,7 @@
     function push(el, conv) {
       if (!el || !conv || seen.has(el)) return;
       seen.add(el);
-      out.push({ el: el, conv: conv, inNav: !!el.closest("nav, aside") });
+      out.push({ el: el, conv: conv, inNav: util.inSidebar(el) });
     }
 
     var rows = document.querySelectorAll('[data-row-key^="chat:"]');
@@ -94,7 +94,7 @@
       var conv = util.convFromHref(a.getAttribute("href") || "");
       if (!conv) continue;
       var el = a.closest("tr, li, [data-row-key]");
-      if (!el && (a.closest("nav, aside") || onListPage())) el = a;
+      if (!el && (util.inSidebar(a) || onListPage())) el = a;
       push(el, conv);
     }
     return out;

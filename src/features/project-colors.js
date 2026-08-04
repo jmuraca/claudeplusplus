@@ -115,7 +115,7 @@
     for (var i = 0; i < links.length; i++) {
       var a = links[i];
       // Sidebar/nav project entries already get a tinted leading icon.
-      if (a.closest("nav, aside")) continue;
+      if (ctx.util.inSidebar(a)) continue;
       var m = (a.getAttribute("href") || "").match(ctx.util.PROJECT_RE);
       if (!m) continue;
       var pid = m[1].toLowerCase();
@@ -148,7 +148,7 @@
     var els = document.querySelectorAll('button, [role="button"]');
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
-      if (el.closest("nav, aside")) continue;
+      if (CPP.util.inSidebar(el)) continue;
       if (/\bpin\b/.test(CPP.util.labelOf(el))) return el;
     }
     return null;

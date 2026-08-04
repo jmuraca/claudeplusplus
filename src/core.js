@@ -176,6 +176,20 @@
       return !!util.closestEl(node, sel);
     },
 
+    // ---- the sidebar -------------------------------------------------------
+    // "Is this in the sidebar?" has more than one right answer on claude.ai:
+    // the docked sidebar is a <nav>/<aside>, but the collapsed sidebar's peek
+    // state renders the same rows inside a popover (#frame-peek-popover, whose
+    // body carries dframe-sidebar-* classes) that is portaled outside both.
+    // Every feature that treats sidebar content differently — hides its rows,
+    // skips it, refuses to put chrome in it — asks here, so the peek state
+    // can't quietly fall through as "not the sidebar".
+    SIDEBAR_SEL: 'nav, aside, [class*="dframe-sidebar"], #frame-peek-popover',
+
+    inSidebar: function (node) {
+      return util.closest(node, util.SIDEBAR_SEL);
+    },
+
     // ---- the accelerator --------------------------------------------------
     // Which physical modifier means "do the bigger version of this" differs by
     // platform (see IS_MAC above), and three things follow from it: whether a

@@ -351,6 +351,26 @@ implies.
   alone**: the click falls through to claude's own handler, which lands you in the right
   place in this tab rather than opening a guess in a new one.
 
+### 🗄️ Archive chats
+claude.ai gives a finished chat two futures: keep cluttering the sidebar and the chat
+lists forever, or be deleted — history, search hits and all. This adds the in-between.
+
+- **Archive** sits in a chat's **⋯** menu (in the sidebar, on `/chats`, in a project's
+  chat list, or on the open chat's own header menu), just above Delete. Archiving hides
+  the chat from the left sidebar, from `/chats` and from its project's list — nothing
+  else changes: the chat is untouched on claude's side, still turns up in **⌘K/Ctrl+K**
+  search, and opens normally from a search result or a direct link.
+- On `/chats` and on a project page, a **Show archived (N)** pill appears above the list
+  whenever it holds archived chats. Toggle it and they're listed again, **dimmed** so they
+  read as set aside; their ⋯ menu now says **Unarchive**, which puts them back everywhere.
+  The choice is remembered. The sidebar always hides archived chats — that's the point.
+  When every chat under a sidebar date heading ("Today", "Aug 2", …) is archived, the
+  heading goes with them; it returns as soon as one of its chats does.
+- Everything is presentation: rows are hidden with a CSS class, never removed, so claude's
+  own list state is never fought with, and disabling the feature restores every row.
+- The archived set is stored **only on this device** (`chrome.storage.local`); deleting a
+  chat for real also drops its archived flag.
+
 More features can be toggled on/off from the popup.
 
 ## Install
@@ -467,6 +487,8 @@ Use `CPP.util.icon(codepoint, rotate)` to build one; `styles/content.css` carrie
 | `cppBookmarkGoto`          | `{ id, anchor }`                      | local  | transient: scroll target handed to the chat page after clicking a bookmark |
 | `cppPromptStash:<conversationUuid>` | `string`                     | local  | the stashed prompt for one chat (one key per chat) |
 | `cppProjectFilesView`      | `"grid" \| "list"`                    | sync   | how a project's Context files are shown |
+| `cppArchivedChats`         | `{ [conversationUuid]: true }`        | local  | chats hidden from the sidebar and the chat lists |
+| `cppShowArchived`          | `boolean`                             | local  | whether the `/chats` and project lists currently show archived chats |
 | `cppFeatures`              | `{ [featureId]: boolean }`            | sync   | per-feature enable/disable       |
 
 **Area** is `chrome.storage.sync` (follows the user between their signed-in Chrome

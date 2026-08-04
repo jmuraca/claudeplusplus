@@ -53,9 +53,10 @@
         "src/features/prompt-stash.js",
         "src/features/queue-edit.js",
         "src/features/search-new-tab.js",
+        "src/features/archive-chats.js",
         "src/features/keyboard-shortcuts-inject.js"
       ],
-      "css": ["styles/content.css", "styles/asides.css", "styles/bookmarks.css", "styles/bookmarks-page.css", "styles/emoji-autocomplete.css", "styles/draft-mode.css", "styles/scroll-nav.css", "styles/export-chat.css", "styles/prompt-stash.css", "styles/queue-edit.css", "styles/project-files-view.css", "styles/file-delete-guard.css"],
+      "css": ["styles/content.css", "styles/asides.css", "styles/bookmarks.css", "styles/bookmarks-page.css", "styles/emoji-autocomplete.css", "styles/draft-mode.css", "styles/scroll-nav.css", "styles/export-chat.css", "styles/prompt-stash.css", "styles/queue-edit.css", "styles/project-files-view.css", "styles/file-delete-guard.css", "styles/archive-chats.css"],
       "run_at": "document_start",
       "world": "ISOLATED"
     }

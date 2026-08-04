@@ -126,6 +126,13 @@
       defaultEnabled: true
     },
     {
+      id: "archive-chats",
+      name: "Archive chats",
+      description:
+        "Adds Archive to a chat's ⋯ menu — the in-between that claude.ai lacks between keeping a chat and deleting it. An archived chat disappears from the left sidebar, /chats and its project's list, but stays searchable in ⌘K/Ctrl+K and opens as normal. On the /chats and project pages a Show archived toggle lists them again, dimmed, where the same menu offers Unarchive. The archived set is stored only on this device.",
+      defaultEnabled: true
+    },
+    {
       id: "keyboard-shortcuts-inject",
       name: "Keyboard shortcuts in help menu",
       description:

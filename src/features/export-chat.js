@@ -50,7 +50,7 @@
     var els = document.querySelectorAll('button, [role="button"], a');
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
-      if (el.closest("nav, aside")) continue;
+      if (CPP.util.inSidebar(el)) continue;
       if (/\bshare\b/.test(CPP.util.labelOf(el))) return el;
     }
     return null;
